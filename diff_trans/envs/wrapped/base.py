@@ -1,0 +1,163 @@
+import time
+from typing import Any, Dict, Optional, Tuple, Union, List, Type
+from functools import partial
+
+import numpy as np
+
+import gymnasium as gym
+from gymnasium import Env, error, logger, spaces
+
+# from gymnasium.vector import VectorEnv
+from gymnasium.spaces import Box
+from gymnasium.vector.utils import batch_space
+
+from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common import env_util
+
+import jax
+from jax import numpy as jnp
+from jax import lax
+
+import mujoco
+from mujoco import mjx
+
+from ... import sim, envs
+
+DEFAULT_SIZE = 480
+
+
+class BaseEnv(VecEnv):
+    # TODO: Add parameter specifications
+    def __init__(
+        self,
+        num_envs: int,
+        env: envs.EnvConfig,
+        max_episode_steps: int,
+        observation_space: Box,
+        action_space: Box,
+    ) -> None:
+        self.env = env
+        self.num_env = num_envs
+        self.num_envs = num_envs
+
+        self.max_episode_steps = max_episode_steps
+
+        self.observation_space = observation_space
+        self.action_space = action_space
+
+    def reset(self):
+        obs = self._reset_all()
+
+        self.steps = np.zeros(self.num_env, dtype=int)
+        self.rewards = np.zeros((self.num_env, 1), dtype=np.float64)
+        self.time_start = np.array([time.time() for _ in range(self.num_env)])
+
+        return obs
+    
+    def _reset_all(self) -> np.ndarray:
+        rng = jax.random.PRNGKey(time.time_ns())
+        rng = jax.random.split(rng, self.num_envs)
+
+        self._states = self.env.reset_vj(rng)
+        obs = self.env._get_obs_vj(self._states)
+
+        return np.asarray(obs)
+
+    def _reset_at(self, at: np.ndarray) -> np.ndarray:
+        n = at.astype(np.int32).sum()
+
+        rng = jax.random.PRNGKey(time.time_ns())
+        rng = jax.random.split(rng, n)
+
+        data = self._states
+        new_data = self.env.reset_vj(rng)
+
+        new_qpos = data.qpos.at[at].set(new_data.qpos)
+        new_qvel = data.qvel.at[at].set(new_data.qvel)
+
+        data = data.replace(qpos=new_qpos, qvel=new_qvel)
+
+        self._states = data
+        obs = self.env._get_obs_vj(data)
+
+        return np.asarray(obs)
+
+    def update_steps(
+        self, reward: np.ndarray, done: np.ndarray
+    ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
+        if self.steps.max() >= self.rewards.shape[1]:
+            self.rewards = np.hstack([self.rewards, self.rewards])
+
+        self.rewards[:, self.steps] = reward.flatten()
+        self.steps += 1
+
+        # Truncate
+        done[self.steps >= self.max_episode_steps] = True
+
+        info = [{} for _ in range(self.num_env)]
+        needs_reset = np.zeros(self.num_env, dtype=bool)
+        for idx, d in enumerate(done):
+            if not d:
+                continue
+
+            steps = self.steps[idx]
+            r = self.rewards[idx][: steps]
+            t = time.time() - self.time_start[idx]
+
+            episode = {}
+            episode["r"] = np.sum(r)
+            episode["l"] = steps
+            episode["t"] = t
+
+            info[idx]["episode"] = episode
+
+            needs_reset[idx] = True
+        
+        reset_num = np.sum(needs_reset.astype(np.int32))
+        if reset_num > 0:
+            self._reset_at(needs_reset)
+            self.steps[needs_reset] = 0
+
+        return done, info
+
+    def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
+        NotImplementedError()
+
+    def step_async(self, actions: np.ndarray) -> None:
+        self._actions = jnp.array(actions)
+
+    def close(self) -> None:
+        pass
+
+    def _get_indices_len(self, indices) -> int:
+        if indices is None:
+            return self.num_env
+        if isinstance(indices, int):
+            return 1
+        return len(indices)
+
+    def get_attr(self, attr_name: str, indices=None) -> List[Any]:
+        num = self._get_indices_len(indices)
+        attr = getattr(self, attr_name)
+        return [attr for _ in range(num)]
+
+    def set_attr(self, attr_name: str, value: Any, indices=None) -> None:
+        val = value if indices is None else value[0]
+        setattr(self, attr_name, val)
+
+    def env_method(
+        self, method_name: str, *method_args, indices=None, **method_kwargs
+    ) -> List[Any]:
+        num = self._get_indices_len(indices)
+
+        method = getattr(self, method_name)
+        value = method(*method_args, **method_kwargs)
+        return [value for _ in range(num)]
+
+    def env_is_wrapped(
+        self, wrapper_class: Type[gym.Wrapper], indices=None
+    ) -> List[bool]:
+        """Check if worker environments are wrapped with a given wrapper"""
+        num = self._get_indices_len(indices)
+        result = env_util.is_wrapped(self, wrapper_class)
+        return [result for _ in range(num)]
