@@ -1,5 +1,4 @@
 from typing import Dict, Tuple, List, cast
-import time
 
 import numpy as np
 
@@ -157,10 +156,10 @@ class HalfCheetah(BaseEnv):
             low=-np.inf,
             high=np.inf,
             shape=(env.state_dim,),
-            dtype=np.float64,
+            dtype=np.float32,
         )
         action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float64
+            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
         )
 
         super().__init__(
@@ -170,27 +169,26 @@ class HalfCheetah(BaseEnv):
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
     
-    def _control_cost(self, actions) -> np.ndarray:
-        return self._ctrl_cost_weight * np.sum(np.square(actions), axis=1)
+    def _control_cost(self, actions: jnp.ndarray) -> jnp.ndarray:
+        return self._ctrl_cost_weight * jnp.sum(jnp.square(actions), axis=1)
 
-    def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
+    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         data = self._states
         control = self._actions
 
-        qpos_before = np.asarray(data.qpos)
+        qpos_before = jnp.asarray(data.qpos)
         data = sim.step_vj(self.env, self.env.model, data, control)
         self._states = data
 
-        qpos = np.asarray(data.qpos)
-        observation = np.asarray(self.env._get_obs_vj(data))
+        qpos = data.qpos
+        observation = self.env._get_obs_vj(data)
 
         x_velocity = (qpos[:, 0] - qpos_before[:, 0]) / self.env.dt
         forward_reward = self._forward_reward_weight * x_velocity
-        ctrl_cost = self._control_cost(np.asarray(control))
+        ctrl_cost = self._control_cost(control)
         reward = forward_reward - ctrl_cost
 
-        done = np.zeros(self.num_env, dtype=bool)
-        done, info = self.update_steps(reward, done)
+        done = jnp.zeros(self.num_env, dtype=bool)
 
-        return observation, reward, done, info
+        return observation, reward, done
   

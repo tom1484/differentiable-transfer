@@ -11,26 +11,32 @@ Trajectory = List[
 
 
 def single_transition_loss(env: EnvConfig, parameter: jnp.ndarray, trajectories: List[Trajectory]):
+    """
+    Compute the loss for a single transition.
+    This only works under full observability.
+    """
     observations = []
     next_observations = []
     actions = []
 
     for trajectory in trajectories:
-        for observation, next_observation, action, reward, done in trajectory:
-            observations.append(observation)
-            next_observations.append(next_observation)
-            actions.append(action)
+        for observation, next_observation, action, _, done in trajectory:
+            if not done:
+                observations.append(observation)
+                next_observations.append(next_observation)
+                actions.append(action)
     
     observations = jnp.array(observations)
     next_observations = jnp.array(next_observations)
     actions = jnp.array(actions)
 
     model = env.set_parameter(env.model, parameter)
-    datas = env._state_to_data_vj(env.data, observations)
-    next_data = sim.step_vj(env, model, datas, actions)
+    data = env.data
+    # _, next_observations_sim = sim.step_at_v(env, model, data, observations, actions)
+    # WARNING: Temporary disable for JAX issue
+    _, next_observations_sim = sim.step_at_vj(env, model, data, observations, actions)
 
-    next_observations_sim = env._get_obs_vj(next_data)
     diff = next_observations - next_observations_sim
-    loss = jnp.mean(jnp.sum(diff ** 2, axis=-1))
+    loss = jnp.mean(jnp.sum(diff ** 2, axis=1))
     
     return loss

@@ -52,7 +52,7 @@ class HalfCheetahConfig(EnvConfig):
         frame_skip: int = 2,
         reset_noise_scale: float = 0.1,
     ):
-        observation_dim = 17 
+        observation_dim = 18
         super().__init__(
             "half_cheetah.xml",
             frame_skip,
@@ -136,11 +136,17 @@ class HalfCheetahConfig(EnvConfig):
 
     def _parameter_to_data(self, data: mjx.Data, parameters: jnp.ndarray) -> mjx.Data:
         return {}
+    
+    def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+        qpos = states[:9]
+        qvel = states[9:]
+        return data.replace(qpos=qpos, qvel=qvel)
 
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         return data.replace(ctrl=control)
 
     def _get_obs(self, env_data: mjx.Data) -> np.ndarray:
-        return jnp.concatenate([env_data.qpos[1:], env_data.qvel])
+        return jnp.concatenate([env_data.qpos, env_data.qvel])
+        # return jnp.concatenate([env_data.qpos[1:], env_data.qvel])
 
 

@@ -1,8 +1,8 @@
 import os
-from typing import List
+from typing import List, Tuple
 
 
-def get_exp_file_levels(root: str, filepath: str) -> str:
+def get_exp_file_levels(root: str, filepath: str) -> List[str]:
     levels = []
     while True:
         filepath, level = os.path.split(filepath)
@@ -16,15 +16,13 @@ def get_exp_file_levels(root: str, filepath: str) -> str:
     return levels
 
 
-def create_exp_dirs(
-    root: str, exp_levels: List[str], exp_name: str, override: bool
-) -> tuple[str, str]:
-    exp_levels.append(exp_name)
+def create_exp_dirs(root: str, exp_levels: List[str], exp_name: str) -> Tuple[str, str]:
+    exp_levels = [*exp_levels, exp_name]
 
     logs_dir = os.path.join(root, "logs", *exp_levels)
     models_dir = os.path.join(root, "models", *exp_levels)
 
-    os.makedirs(logs_dir, exist_ok=override)
-    os.makedirs(models_dir, exist_ok=override)
+    os.makedirs(logs_dir, exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
 
     return logs_dir, models_dir

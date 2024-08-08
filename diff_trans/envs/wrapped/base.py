@@ -1,33 +1,25 @@
 import time
-from typing import Any, Dict, Optional, Tuple, Union, List, Type
-from functools import partial
+from typing import Any, Dict, Tuple, List, Type
 
 import numpy as np
 
 import gymnasium as gym
-from gymnasium import Env, error, logger, spaces
 
-# from gymnasium.vector import VectorEnv
 from gymnasium.spaces import Box
-from gymnasium.vector.utils import batch_space
 
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common import env_util
 
 import jax
 from jax import numpy as jnp
-from jax import lax
 
-import mujoco
-from mujoco import mjx
+from ... import envs
 
-from ... import sim, envs
 
 DEFAULT_SIZE = 480
 
 
 class BaseEnv(VecEnv):
-    # TODO: Add parameter specifications
     def __init__(
         self,
         num_envs: int,
@@ -49,7 +41,7 @@ class BaseEnv(VecEnv):
         obs = self._reset_all()
 
         self.steps = np.zeros(self.num_env, dtype=int)
-        self.rewards = np.zeros((self.num_env, 1), dtype=np.float64)
+        self.rewards = np.zeros((self.num_env, 1), dtype=np.float32)
         self.time_start = np.array([time.time() for _ in range(self.num_env)])
 
         return obs
@@ -61,7 +53,7 @@ class BaseEnv(VecEnv):
         self._states = self.env.reset_vj(rng)
         obs = self.env._get_obs_vj(self._states)
 
-        return np.asarray(obs)
+        return np.asarray(obs).copy()
 
     def _reset_at(self, at: np.ndarray) -> np.ndarray:
         n = at.astype(np.int32).sum()
@@ -71,19 +63,18 @@ class BaseEnv(VecEnv):
 
         data = self._states
         new_data = self.env.reset_vj(rng)
+        obs = self.env._get_obs_vj(new_data)
 
         new_qpos = data.qpos.at[at].set(new_data.qpos)
         new_qvel = data.qvel.at[at].set(new_data.qvel)
 
         data = data.replace(qpos=new_qpos, qvel=new_qvel)
-
         self._states = data
-        obs = self.env._get_obs_vj(data)
 
-        return np.asarray(obs)
+        return np.asarray(obs).copy()
 
-    def update_steps(
-        self, reward: np.ndarray, done: np.ndarray
+    def _update_steps(
+        self, observation: np.ndarray, reward: np.ndarray, done: np.ndarray
     ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
         if self.steps.max() >= self.rewards.shape[1]:
             self.rewards = np.hstack([self.rewards, self.rewards])
@@ -94,6 +85,7 @@ class BaseEnv(VecEnv):
         # Truncate
         done[self.steps >= self.max_episode_steps] = True
 
+        # Calculate episode info for done environments
         info = [{} for _ in range(self.num_env)]
         needs_reset = np.zeros(self.num_env, dtype=bool)
         for idx, d in enumerate(done):
@@ -113,15 +105,27 @@ class BaseEnv(VecEnv):
 
             needs_reset[idx] = True
         
+        # Reset done environments
         reset_num = np.sum(needs_reset.astype(np.int32))
         if reset_num > 0:
-            self._reset_at(needs_reset)
+            reset_obs = self._reset_at(needs_reset)
+            observation[needs_reset] = reset_obs
             self.steps[needs_reset] = 0
 
-        return done, info
+        return observation, done, info
+
+    def _step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
+        NotImplementedError()
 
     def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
-        NotImplementedError()
+        observation, reward, done = self._step_wait()
+        observation = np.asarray(observation).copy()
+        reward = np.asarray(reward).copy()
+        done = np.asarray(done).copy()
+        # Update the done flag and auto reset the environments if needed
+        observation, done, info = self._update_steps(observation, reward, done)
+
+        return observation, reward, done, info
 
     def step_async(self, actions: np.ndarray) -> None:
         self._actions = jnp.array(actions)

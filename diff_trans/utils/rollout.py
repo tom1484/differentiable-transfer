@@ -17,6 +17,7 @@ def rollout_transitions(env: BaseEnv, model, num_transitions=100):
     num_transitions = num_steps * num_envs
 
     observations = []
+    next_observations = []
     actions = []
     rewards = []
     dones = []
@@ -27,6 +28,7 @@ def rollout_transitions(env: BaseEnv, model, num_transitions=100):
         next_observation, reward, done, _ = env.step(action)
 
         observations.append(observation)
+        next_observations.append(next_observation)
         actions.append(action)
         rewards.append(reward)
         dones.append(done)
@@ -34,12 +36,10 @@ def rollout_transitions(env: BaseEnv, model, num_transitions=100):
         observation = next_observation
 
     observations = squeeze_array_envs(jnp.array(observations))
+    next_observations = squeeze_array_envs(jnp.array(next_observations))
     actions = squeeze_array_envs(jnp.array(actions))
     rewards = squeeze_array_envs(jnp.array(rewards))
     dones = squeeze_array_envs(jnp.array(dones))
-
-    next_observations = jnp.roll(observations, -1, axis=1)
-    next_observations = next_observations.at[dones].set(0.0)
 
     trajectories = []
     for i in range(num_envs):

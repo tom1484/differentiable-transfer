@@ -1,17 +1,10 @@
-from typing import Dict, Tuple, List, cast
-import time
+from typing import Tuple
 
 import numpy as np
 
-from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
 
-import jax
 from jax import numpy as jnp
-from jax import random
-
-import mujoco
-from mujoco import mjx
 
 from .base import BaseEnv
 from ... import envs, sim
@@ -49,7 +42,7 @@ class InvertedPendulum(BaseEnv):
     - *qpos (2 element):* Position values of the robot's cart and pole.
     - *qvel (2 elements):* The velocities of cart and pole (their derivatives).
 
-    The observation space is a `Box(-Inf, Inf, (4,), float64)` where the elements are as follows:
+    The observation space is a `Box(-Inf, Inf, (4,), float32)` where the elements are as follows:
 
     | Num | Observation                                   | Min  | Max | Name (in corresponding XML file) | Joint | Type (Unit)              |
     | --- | --------------------------------------------- | ---- | --- | -------------------------------- | ----- | ------------------------- |
@@ -130,35 +123,29 @@ class InvertedPendulum(BaseEnv):
             low=-np.inf,
             high=np.inf,
             shape=(env.state_dim,),
-            dtype=np.float64,
+            dtype=np.float32,
         )
         action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float64
+            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
         )
 
         super().__init__(
             num_envs, env, max_episode_steps, observation_space, action_space
         )
 
-    # TEST
-    # def reset_all_to(self, obs: np.ndarray):
-    #     self.reset()
-    #     self._states = self._states.replace(**self.env._state_to_data_vj(obs))
-
-    def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
+    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         data = self._states
         control = self._actions
 
         data = sim.step_vj(self.env, self.env.model, data, control)
         self._states = data
 
-        qpos = np.asarray(data.qpos)
-        observation = np.asarray(self.env._get_obs_vj(data))
+        qpos = data.qpos
+        observation = self.env._get_obs_vj(data)
 
-        is_finite = np.isfinite(qpos).all(axis=1)
-        reward = np.ones(self.num_envs, dtype=np.float64)
+        is_finite = jnp.isfinite(qpos).all(axis=1)
+        reward = jnp.ones(self.num_envs, dtype=jnp.float32)
 
-        done = np.logical_or(np.logical_not(is_finite), np.abs(qpos[:, 1]) > 0.2)
-        done, info = self.update_steps(reward, done)
+        done = jnp.logical_or(jnp.logical_not(is_finite), jnp.abs(qpos[:, 1]) > 0.2)
 
-        return observation, reward, done, info
+        return observation, reward, done
