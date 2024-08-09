@@ -22,7 +22,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class HalfCheetah(BaseEnv):
+class HalfCheetah_v1(BaseEnv):
     """
     ### Description
 
@@ -150,7 +150,7 @@ class HalfCheetah(BaseEnv):
         forward_reward_weight: float = 1.0,
         ctrl_cost_weight: float = 0.1,
     ):
-        env = envs.HalfCheetahConfig()
+        env = envs.HalfCheetahConfig_v1()
 
         observation_space = Box(
             low=-np.inf,

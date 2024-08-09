@@ -1,5 +1,4 @@
 import typer
-from typing import Optional
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -9,7 +8,6 @@ def main(
     name: str = typer.Argument(..., help="Name of the experiment"),
     env_name: str = typer.Option("InvertedPendulum-v1", help="Name of the environment"),
     start_param: int = typer.Option(0, help="Start index of the parameter"),
-    end_param: Optional[int] = typer.Option(None, help="Start index of the parameter"),
     max_tune_epochs: int = typer.Option(5, help="Number of epochs to tune"),
     min_loss: float = typer.Option(1e-4, help="Minimum loss to stop tuning"),
     rollout_length: int = typer.Option(1000, help="Number of transitions to rollout"),
@@ -52,30 +50,6 @@ def main(
     exp_levels = get_exp_file_levels("experiments", __file__)
     logs_dir, models_dir = create_exp_dirs(ROOT_DIR, exp_levels, name)
 
-    # Test log
-    # for i in range(5):
-    #     a = jnp.ones(10)
-    #     metrics = dict(
-    #         p=0,
-    #         iteration=i,
-    #         target_param=a[0],
-    #         param=a[1],
-    #         loss=a[2],
-    #     )
-    #     wandb.log(metrics)
-    # for i in range(5):
-    #     a = jnp.ones(10)
-    #     metrics = dict(
-    #         p=1,
-    #         iteration=i,
-    #         target_param=a[0],
-    #         param=a[1],
-    #         loss=a[2],
-    #     )
-    #     wandb.log(metrics)
-    
-    # wandb.finish()
-
     # Setup envs and parameters
     env_type = get_env(env_name)
     preal_env = env_type(num_envs=train_num_envs)
@@ -90,8 +64,7 @@ def main(
     model_name = "ppo_inverted_pendulum"
 
     # Start parameter tuning
-    end_param = end_param or default_parameter.shape[0]
-    for p in range(start_param, end_param):
+    for p in range(start_param, default_parameter.shape[0]):
         # Create run
         run_name = "-".join([*exp_levels, name, f"{p:02d}"])
         wandb.init(
@@ -112,11 +85,13 @@ def main(
 
         # Set parameter p to target value
         default_param = default_parameter[p]
-        target_param = default_param + deviation_ratio * (
-            parameter_range[1][p] - default_param
+        target_parameter = default_parameter + deviation_ratio * (
+            parameter_range[1] - default_parameter
         )
+        target_param = target_parameter[p]
+
         preal_env_conf.model = preal_env_conf.set_parameter(
-            preal_env_conf.model, default_parameter.at[p].set(target_param)
+            preal_env_conf.model, target_parameter
         )
         env_conf.model = env_conf.set_parameter(env_conf.model, default_parameter)
 

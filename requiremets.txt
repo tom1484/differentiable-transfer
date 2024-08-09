@@ -1,0 +1,17 @@
+sbx-rl==0.17.0
+flax==0.8.5
+absl-py==2.0.0
+chex==0.1.86
+jax==0.4.28
+jax-cuda12-pjrt==0.4.28
+jax-cuda12-plugin==0.4.28
+jaxlib==0.4.28
+optax==0.2.3
+orbax-checkpoint==0.1.6
+gymnasium==0.29.1
+mujoco==3.2.1
+mujoco-mjx==3.2.1
+numpy==1.24.4
+stable_baselines3==2.4.0a7
+typer==0.12.3
+scipy==1.14.0

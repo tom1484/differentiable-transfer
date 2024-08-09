@@ -16,7 +16,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class InvertedPendulum(BaseEnv):
+class InvertedPendulum_v2(BaseEnv):
     """
     ## Description
     This environment is the Cartpole environment, based on the work of Barto, Sutton, and Anderson in ["Neuronlike adaptive elements that can solve difficult learning control problems"](https://ieeexplore.ieee.org/document/6313077),
@@ -117,7 +117,7 @@ class InvertedPendulum(BaseEnv):
         num_envs: int = 1,
         max_episode_steps: int = 1000,
     ):
-        env = envs.InvertedPendulumConfig()
+        env = envs.InvertedPendulumConfig_v2()
 
         observation_space = Box(
             low=-np.inf,

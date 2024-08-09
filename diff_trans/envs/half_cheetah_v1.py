@@ -1,10 +1,5 @@
-from os import path
-from typing import Dict
-from functools import partial
-
 import numpy as np
 
-import jax
 from jax import numpy as jnp
 from jax import random
 
@@ -13,7 +8,7 @@ from mujoco import mjx
 from .base import EnvConfig
 
 
-class HalfCheetahConfig(EnvConfig):
+class HalfCheetahConfig_v1(EnvConfig):
     """
     ## Parameter Space
 
@@ -134,9 +129,6 @@ class HalfCheetahConfig(EnvConfig):
             body_mass=mass,
         )
 
-    def _parameter_to_data(self, data: mjx.Data, parameters: jnp.ndarray) -> mjx.Data:
-        return {}
-    
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         qpos = states[:9]
         qvel = states[9:]

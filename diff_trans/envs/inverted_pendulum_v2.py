@@ -1,10 +1,5 @@
-from os import path
-from typing import Dict
-from functools import partial
-
 import numpy as np
 
-import jax
 from jax import numpy as jnp
 from jax import random
 
@@ -13,7 +8,7 @@ from mujoco import mjx
 from .base import EnvConfig
 
 
-class InvertedPendulumConfig(EnvConfig):
+class InvertedPendulumConfig_v2(EnvConfig):
     """
     ## Parameter Space
 
@@ -34,17 +29,19 @@ class InvertedPendulumConfig(EnvConfig):
         frame_skip: int = 2,
         reset_noise_scale: float = 0.02,
     ):
-        observation_dim = 4
-        super().__init__("inverted_pendulum.xml", frame_skip, observation_dim)
+        # observation_dim = 4
+        # super().__init__("inverted_pendulum.xml", frame_skip, observation_dim)
 
-        self.reset_noise_scale = reset_noise_scale
+        # self.reset_noise_scale = reset_noise_scale
 
-        self.parameter_range = jnp.array(
-            [
-                [0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 5.0, 2.5],
-                [0.5, 0.5, 2.0, 1.0, 1.5, 1.5, 15.0, 7.5],
-            ]
-        )
+        # self.parameter_range = jnp.array(
+        #     [
+        #         [0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 5.0, 2.5],
+        #         [0.5, 0.5, 2.0, 1.0, 1.5, 1.5, 15.0, 7.5],
+        #     ]
+        # )
+
+        raise NotImplementedError("InvertedPendulumConfig_v2 is not implemented yet")
 
     def reset(self, key: jnp.array) -> mjx.Data:
         noise_low = -self.reset_noise_scale
@@ -94,9 +91,6 @@ class InvertedPendulumConfig(EnvConfig):
             body_mass=mass,
         )
 
-    def _parameter_to_data(self, data: mjx.Data, parameters: jnp.ndarray) -> mjx.Data:
-        return data.replace()
-    
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         qpos = states[:2]
         qvel = states[2:]
