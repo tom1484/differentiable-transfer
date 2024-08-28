@@ -1,4 +1,6 @@
 from jax import numpy as jnp
+import numpy as np
+from stable_baselines3.common.base_class import BaseAlgorithm
 
 from ..envs.wrapped import BaseEnv
 
@@ -63,3 +65,25 @@ def rollout_transitions(env: BaseEnv, model, num_transitions=100):
             s = t
 
     return trajectories
+
+
+def evaluate_policy(env: BaseEnv, model: BaseAlgorithm, num_episodes=128):
+    obs = env.reset()
+    returns = []
+    acc_rewards = [0 for _ in range(env.num_envs)]
+
+    while True:
+        actions = model.predict(obs)[0]
+        obs, rewards, dones, _ = env.step(actions)
+        
+        for i, reward in enumerate(rewards):
+            acc_rewards[i] += reward
+            if dones[i]:
+                returns.append(acc_rewards[i])
+                acc_rewards[i] = 0
+        
+        if len(returns) >= num_episodes:
+            break
+    
+    returns = np.array(returns[:num_episodes])
+    return returns.mean(), returns.std()

@@ -44,9 +44,6 @@ class EnvConfig:
         self.dt = frame_skip * mj_model.opt.timestep
 
         self.reset_vj = jax.jit(jax.vmap(self.reset))
-        self._parameter_to_data_vj = jax.jit(
-            jax.vmap(self._parameter_to_data, in_axes=(None, 0))
-        )
         self._state_to_data_vj = jax.jit(
             jax.vmap(self._state_to_data, in_axes=(None, 0))
         )
