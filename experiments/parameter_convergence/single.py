@@ -42,7 +42,7 @@ def main(
     from stable_baselines3.common.evaluation import evaluate_policy
 
     from definitions import ROOT_DIR
-    from utils.path import get_exp_file_levels, create_exp_dirs
+    from utils.path import get_exp_file_levels, create_exp_assets
 
     from diff_trans.envs.wrapped import get_env
     from diff_trans.utils.loss import single_transition_loss
@@ -50,7 +50,7 @@ def main(
 
     # Create folders for the experiment
     exp_levels = get_exp_file_levels("experiments", __file__)
-    logs_dir, models_dir = create_exp_dirs(ROOT_DIR, exp_levels, name)
+    logs_dir, models_dir = create_exp_assets(ROOT_DIR, exp_levels, name)
 
     # Test log
     # for i in range(5):

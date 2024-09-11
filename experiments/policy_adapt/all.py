@@ -10,9 +10,13 @@ def main(
     exp_start: int = typer.Option(0, help="Start index of the experiment"),
     num_exp: int = typer.Option(3, help="Number of experiments"),
     env_name: str = typer.Option("InvertedPendulum-v1", help="Name of the environment"),
-    baseline_timesteps: int = typer.Option(
-        5e5, help="Number of timesteps to train baseline models"
+    # baseline_timesteps: int = typer.Option(
+    #     5e5, help="Number of timesteps to train baseline models"
+    # ),
+    baseline_round_timesteps: int = typer.Option(
+        5e4, help="Number of timesteps to check threshold"
     ),
+    baseline_threshold: float = typer.Option(150, help="Threshold of evaluation return"),
     baseline_num_envs: int = typer.Option(16, help="Number of parallel environments"),
     param_deviation: float = typer.Option(
         0.3, help="Deviation from the default parameter"
@@ -36,18 +40,19 @@ def main(
     import wandb
 
     from jax import numpy as jnp
+
     # from sbx import PPO
     from stable_baselines3 import PPO
 
     from definitions import ROOT_DIR
-    from utils.path import get_exp_file_levels, create_exp_dirs
+    from utils.path import get_exp_file_levels, create_exp_assets
 
     from diff_trans.envs.wrapped import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
     # Create folders for the experiment
     exp_levels = get_exp_file_levels("experiments", __file__)
-    logs_dir, models_dir = create_exp_dirs(ROOT_DIR, exp_levels, name)
+    logs_dir, models_dir = create_exp_assets(ROOT_DIR, exp_levels, name)
 
     # Setup envs and parameters
     Env = get_env(env_name)
@@ -80,6 +85,35 @@ def main(
     print(f"Default parameter: {default_parameter}")
     print()
 
+    def get_eval_callback(eval_env, prefix: str = ""):
+        steps = 0
+        eval_steps = 0
+
+        prefix = prefix + "_" if len(prefix) > 0 else ""
+
+        def eval(*args, **kwargs):
+            nonlocal steps, eval_steps
+
+            steps += adapt_num_envs
+            if steps - eval_steps < eval_num_steps:
+                return True
+            eval_steps = steps - (steps % eval_num_steps)
+
+            model: PPO = args[0]["self"]
+            eval_stats = evaluate_policy(eval_env, model, eval_num_episodes)
+
+            if log_wandb:
+                metrics = {
+                    "timestep": steps,
+                    f"{prefix}eval_mean": eval_stats[0],
+                    f"{prefix}eval_std": eval_stats[1],
+                }
+                wandb.log(metrics)
+
+            return True
+
+        return eval
+
     # Train baseline model
     model_name = f"PPO-{env_name}-baseline"
     model = PPO("MlpPolicy", sim_env, verbose=0)
@@ -89,12 +123,40 @@ def main(
         print(f"Loading baseline model from {model_path}")
         model = model.load(model_path, sim_env)
     else:
-        model.learn(total_timesteps=baseline_timesteps, progress_bar=True)
-        model.save(model_path)
+        if log_wandb:
+            run_name = "-".join([*exp_levels, name, "baseline"])
+            wandb.init(
+                project="differentiable-transfer",
+                name=run_name,
+                config={
+                    "env_name": env_name,
+                    # "baseline_timesteps": baseline_timesteps,
+                    "baseline_round_timesteps": baseline_round_timesteps,
+                    "baseline_num_envs": baseline_num_envs,
+                    "param_deviation": param_deviation,
+                    "adapt_train_lr": adapt_train_lr,
+                    "adapt_timesteps": adapt_timesteps,
+                    "adapt_num_envs": adapt_num_envs,
+                    "eval_num_steps": eval_num_steps,
+                    "eval_num_episodes": eval_num_episodes,
+                },
+            )
 
-    baseline_eval_stats = evaluate_policy(sim_eval_env, model, eval_num_episodes)
-    print(f"Baseline evaluation stats: {baseline_eval_stats}")
-    print()
+        eval_callback = get_eval_callback(sim_eval_env, prefix="baseline")
+        while True:
+            model.learn(
+                total_timesteps=baseline_round_timesteps,
+                callback=eval_callback,
+                progress_bar=True,
+            )
+            baseline_eval = evaluate_policy(sim_eval_env, model, eval_num_episodes)
+            if baseline_eval[0] >= baseline_threshold:
+                print(f"Baseline evaluation: {baseline_eval}")
+                print()
+
+                break
+
+        model.save(model_path)
 
     # Start adaptation
     for i in range(exp_start, exp_start + num_exp):
@@ -107,8 +169,7 @@ def main(
                 config={
                     "env_name": env_name,
                     "id": i,
-                    "baseline_return": baseline_eval_stats[0],
-                    "baseline_timesteps": baseline_timesteps,
+                    "baseline_return": baseline_eval[0],
                     "baseline_num_envs": baseline_num_envs,
                     "param_deviation": param_deviation,
                     "adapt_train_lr": adapt_train_lr,
@@ -129,31 +190,10 @@ def main(
         eval_stats = evaluate_policy(preal_eval_env, model, eval_num_episodes)
         print(f"Initial evaluation stats: {eval_stats}")
 
-        steps = 0
-        eval_steps = 0
-
-        def eval(*args, **kwargs):
-            nonlocal steps, eval_steps
-
-            steps += adapt_num_envs
-            if steps - eval_steps < eval_num_steps:
-                return True
-            eval_steps = steps - (steps % eval_num_steps)
-
-            model: PPO = args[0]["self"]
-            eval_stats = evaluate_policy(preal_eval_env, model, eval_num_episodes)
-
-            if log_wandb:
-                metrics = dict(
-                    timestep=steps,
-                    eval_mean=eval_stats[0],
-                    eval_std=eval_stats[1],
-                )
-                wandb.log(metrics)
-
-            return True
-
-        model.learn(total_timesteps=adapt_timesteps, callback=eval, progress_bar=True)
+        eval_callback = get_eval_callback(preal_eval_env)
+        model.learn(
+            total_timesteps=adapt_timesteps, callback=eval_callback, progress_bar=True
+        )
 
         # Evaluate model
         eval_stats = evaluate_policy(preal_eval_env, model, eval_num_episodes)

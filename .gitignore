@@ -1,6 +1,9 @@
 wandb/
 
 models/
+logs/
+configs/
+parallel_tmp/
 *.ipynb
 
 .vscode/
