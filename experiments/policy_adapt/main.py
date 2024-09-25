@@ -5,80 +5,76 @@ from dataclasses_json import dataclass_json
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
+
 # Configuration dataclass for experiment settings
 @dataclass_json
 @dataclass
 class CONFIG:
-    name: str
-    gpu: Optional[int] = None
+    cuda_visible_devices: Optional[List[str]] = None
     exp_start: int = 0
     num_exp: int = 3
+
+    algorithm: str = "PPO"
     env_name: str = "InvertedPendulum-v1"
-    baseline_round_timesteps: int = 5e4
-    baseline_threshold: float = 150
-    baseline_num_envs: int = 16
+
+    baseline_max_timesteps: int = 1000000
+    baseline_threshold: float = 100
+    baseline_num_envs: int = 256
+
     adapt_params: Union[None, int, List[int]] = None
     param_values: Union[None, float, List[float]] = None
     param_deviations: Union[float, List[float]] = 0.3
+
     adapt_train_lr: float = 1e-2
-    adapt_timesteps: int = 5e5
-    adapt_num_envs: int = 16
-    log_wandb: bool = True
-    eval_num_steps: int = 1e4
+    adapt_max_timesteps: int = 1000000
+    adapt_threshold: int = 100
+    adapt_num_envs: int = 256
+
     eval_num_episodes: int = 256
+    eval_frequency: int = 10000
+
+    log_wandb: bool = True
     override: bool = False
     debug_nans: bool = False
+
 
 # Main entry point for the experiment
 @app.command()
 def main(name: str = typer.Argument(..., help="Name of the experiment")):
     import json
-    from definitions import ROOT_DIR
-    from utils.path import get_exp_file_levels, create_exp_assets
+    from utils.exp import load_config
 
-    # Initialize default configuration
-    default_config = CONFIG(name=name)
+    config, exp_levels, models_dir = load_config(__file__, name, CONFIG)
 
-    # Create experiment assets (folders and default configuration)
-    exp_levels = get_exp_file_levels("experiments", __file__)
-    new_config, config_path, models_dir = create_exp_assets(
-        ROOT_DIR, exp_levels, name, default_config.to_dict()
-    )
-
-    if new_config:
+    if config is None:
         print("Configuration created")
         return
 
-    # Load user-modified configuration
-    config_file = open(config_path, "r")
-    config_dict = json.load(config_file)
-    config_file.close()
-
-    config = cast(CONFIG, CONFIG.from_dict(config_dict))
-
-    from experiments.env import set_jax_config
+    from experiments.env import set_env_vars
 
     # Set up JAX configuration
-    set_jax_config(debug_nans=config.debug_nans)
-
-    import jax
-    import torch
-
-    if config.gpu is not None:
-        torch.set_default_device(f"cuda:{config.gpu}")
-        jax.default_device = jax.devices("gpu")[config.gpu]
+    set_env_vars(
+        jax_debug_nans=config.debug_nans,
+        cuda_visible_devices=config.cuda_visible_devices,
+    )
 
     import os
     import wandb
 
     from jax import numpy as jnp
-    # from sbx import PPO
-    from stable_baselines3 import PPO
 
     from diff_trans.envs.wrapped import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
+    from diff_trans.utils.callbacks import (
+        StopTrainingOnRewardThreshold,
+        EvalCallback,
+    )
+
     from utils.exp import convert_arg_array
+    from constants import ALGORITHMS
+
+    Algorithm = ALGORITHMS[config.algorithm]
 
     # Initialize environments and parameters
     Env = get_env(config.env_name)
@@ -125,86 +121,68 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     preal_eval_env.env.model = preal_env_conf.model
 
     print(f"Target parameter: {target_parameter}")
-    print(f"Default parameter: {default_parameter}")
-    print()
-
-    # Define evaluation callback function
-    def get_eval_callback(eval_env, prefix: str = ""):
-        steps = 0
-        eval_steps = 0
-
-        prefix = prefix + "_" if len(prefix) > 0 else ""
-
-        def eval(*args, **kwargs):
-            nonlocal steps, eval_steps
-
-            steps += config.adapt_num_envs
-            if steps - eval_steps < config.eval_num_steps:
-                return True
-            eval_steps = steps - (steps % config.eval_num_steps)
-
-            model: PPO = args[0]["self"]
-            eval_stats = evaluate_policy(eval_env, model, config.eval_num_episodes)
-
-            if config.log_wandb:
-                metrics = {
-                    "timestep": steps,
-                    f"{prefix}eval_mean": eval_stats[0],
-                    f"{prefix}eval_std": eval_stats[1],
-                }
-                wandb.log(metrics)
-
-            return True
-
-        return eval
+    print(f"Default parameter: {default_parameter}\n")
 
     # Train baseline model
-    model_name = f"PPO-{config.env_name}-baseline"
-    model = PPO("MlpPolicy", sim_env, verbose=0)
+    model_name = f"{config.algorithm}-{config.env_name}-baseline"
+    model = Algorithm("MlpPolicy", sim_env, verbose=0)
     model_path = os.path.join(models_dir, f"{model_name}.zip")
 
     if os.path.exists(model_path) and not config.override:
         print(f"Loading baseline model from {model_path}")
         model = model.load(model_path, sim_env)
+
+        baseline_eval = evaluate_policy(sim_eval_env, model, config.eval_num_episodes)
     else:
         # Initialize wandb logging for baseline training
         if config.log_wandb:
             run_name = "-".join([*exp_levels, name, "baseline"])
+            tags = [*exp_levels, name, "baseline", config.env_name, config.algorithm]
             wandb.init(
                 project="differentiable-transfer",
                 name=run_name,
+                tags=tags,
                 config={
                     "env_name": config.env_name,
-                    # "baseline_timesteps": baseline_timesteps,
-                    "baseline_round_timesteps": config.baseline_round_timesteps,
+                    "baseline_max_timesteps": config.baseline_max_timesteps,
                     "baseline_num_envs": config.baseline_num_envs,
                     "param_deviations": config.param_deviations,
-                    "adapt_train_lr": config.adapt_train_lr,
-                    "adapt_timesteps": config.adapt_timesteps,
-                    "adapt_num_envs": config.adapt_num_envs,
-                    "eval_num_steps": config.eval_num_steps,
                     "eval_num_episodes": config.eval_num_episodes,
+                    "eval_frequency": config.eval_frequency,
                 },
             )
 
-        # Train baseline model until performance threshold is reached
-        eval_callback = get_eval_callback(sim_eval_env, prefix="baseline")
-        while True:
-            model.learn(
-                total_timesteps=config.baseline_round_timesteps,
-                callback=eval_callback,
-                progress_bar=True,
-            )
-            baseline_eval = evaluate_policy(
-                sim_eval_env, model, config.eval_num_episodes
-            )
-            if baseline_eval[0] >= config.baseline_threshold:
-                print(f"Baseline evaluation: {baseline_eval}")
-                print()
+            def callback_on_log(metrics):
+                if config.log_wandb:
+                    wandb.log(metrics)
+                # else:
+                #     print(metrics)
 
-                break
+        callback_on_best = StopTrainingOnRewardThreshold(
+            reward_threshold=config.baseline_threshold, verbose=1
+        )
+        eval_callback = EvalCallback(
+            sim_eval_env,
+            n_eval_episodes=config.eval_num_episodes,
+            callback_on_new_best=callback_on_best,
+            # callback_on_log=callback_on_log if config.log_wandb else None,
+            callback_on_log=callback_on_log,
+            eval_freq=config.eval_frequency // sim_env.num_envs,
+            verbose=0,
+        )
+
+        # Train baseline model until performance threshold is reached
+        model.learn(
+            total_timesteps=config.baseline_max_timesteps,
+            callback=eval_callback,
+            progress_bar=True,
+        )
+        baseline_eval = evaluate_policy(sim_eval_env, model, config.eval_num_episodes)
+        print(f"Baseline evaluation: {baseline_eval}\n")
 
         model.save(model_path)
+        if config.log_wandb:
+            wandb.finish()
 
     # Start adaptation experiments
     for i in range(config.exp_start, config.exp_start + config.num_exp):
@@ -212,55 +190,82 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
             # Initialize wandb logging for adaptation experiment
             if config.log_wandb:
                 run_name = "-".join([*exp_levels, name, f"{i:02d}"])
+                tags = [
+                    *exp_levels,
+                    name,
+                    f"{i:02d}",
+                    config.env_name,
+                    config.algorithm,
+                ]
                 wandb.init(
                     project="differentiable-transfer",
                     name=run_name,
+                    tags=tags,
                     config={
-                        "env_name": config.env_name,
                         "id": i,
-                        "baseline_return": baseline_eval[0],
-                        "baseline_num_envs": config.baseline_num_envs,
+                        "env_name": config.env_name,
+                        "baseline_mean_return": baseline_eval[0],
                         "param_deviations": config.param_deviations,
                         "adapt_train_lr": config.adapt_train_lr,
-                        "adapt_timesteps": config.adapt_timesteps,
+                        "adapt_threshold": config.adapt_threshold,
                         "adapt_num_envs": config.adapt_num_envs,
-                        "eval_num_steps": config.eval_num_steps,
-                        "eval_num_episodes": config.eval_num_episodes,
+                        "eval_frequency": config.eval_frequency,
                     },
                 )
+
+            def callback_on_log(metrics):
+                if config.log_wandb:
+                    wandb.log(metrics)
+                # else:
+                #     print(metrics)
+
+            callback_on_best = StopTrainingOnRewardThreshold(
+                reward_threshold=config.adapt_threshold, verbose=1
+            )
+            eval_callback = EvalCallback(
+                preal_eval_env,
+                n_eval_episodes=config.eval_num_episodes,
+                callback_on_new_best=callback_on_best,
+                callback_on_log=callback_on_log,
+                eval_freq=config.eval_frequency // preal_env.num_envs,
+                verbose=0,
+            )
 
             print(f"Running experiment {i}")
             print()
 
             # Load baseline model and adapt to new environment
-            model = PPO("MlpPolicy", preal_env, verbose=0)
+            model = Algorithm("MlpPolicy", preal_env, verbose=0)
             model = model.load(model_path, preal_env)
 
             # Evaluate initial performance
-            eval_stats = evaluate_policy(preal_eval_env, model, config.eval_num_episodes)
+            eval_stats = evaluate_policy(
+                preal_eval_env, model, config.eval_num_episodes
+            )
             print(f"Initial evaluation stats: {eval_stats}")
 
             # Adapt model to new environment
-            eval_callback = get_eval_callback(preal_eval_env)
-            model.learn(
-                total_timesteps=config.adapt_timesteps,
+            model = model.learn(
+                total_timesteps=config.adapt_max_timesteps,
                 callback=eval_callback,
                 progress_bar=True,
             )
-
             # Evaluate final performance
-            eval_stats = evaluate_policy(preal_eval_env, model, config.eval_num_episodes)
+            eval_stats = evaluate_policy(
+                preal_eval_env, model, n_eval_episodes=config.eval_num_episodes
+            )
             print(f"Final evaluation stats: {eval_stats}")
-
-            del model
 
             if config.log_wandb:
                 wandb.finish()
 
+            del model
+
         except Exception as e:
             if config.log_wandb:
                 wandb.finish(exit_code=1)
-                raise e
+            raise e
+
 
 if __name__ == "__main__":
     app()

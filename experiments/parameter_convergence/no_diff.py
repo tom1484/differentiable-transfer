@@ -1,8 +1,8 @@
 import typer
 
-from experiments.env import set_jax_config
+from experiments.env import set_env_vars
 
-set_jax_config()
+set_env_vars()
 
 
 def tune(
@@ -24,7 +24,7 @@ def tune(
     from stable_baselines3 import PPO
     from stable_baselines3.common.evaluation import evaluate_policy
 
-    from definitions import ROOT_DIR
+    from constants import ROOT_DIR
     from utils.path import get_exp_file_levels, create_exp_assets
 
     from diff_trans.envs.wrapped import get_env

@@ -230,15 +230,13 @@ def main(
             opt_state = optimizer.init(parameter_subset)
             preal_steps = 0
 
+            model_name = f"{config.algorithm}-{config.env_name}-{exp_id:02d}"
+            model = Algorithm("MlpPolicy", sim_env, verbose=0)
+            # model_path = os.path.join(models_dir, f"{model_name}.zip")
+
             for i in range(config.max_tune_epochs):
                 print(f"Iteration {i}")
                 print()
-
-                model_name = (
-                    f"{config.algorithm}-{config.env_name}-{exp_id:02d}-{i:02d}"
-                )
-                model = Algorithm("MlpPolicy", sim_env, verbose=0)
-                model_path = os.path.join(models_dir, f"{model_name}.zip")
 
                 callback_on_best = StopTrainingOnRewardThreshold(
                     reward_threshold=config.adapt_threshold, verbose=1
@@ -266,7 +264,6 @@ def main(
                     preal_eval_env, model, config.eval_num_episodes
                 )
                 print(f"Preal eval: {preal_eval}\n")
-                model.save(model_path)
 
                 rollouts = rollout_transitions(
                     preal_env, model, num_transitions=config.loss_rollout_length
@@ -275,8 +272,6 @@ def main(
 
                 loss = loss_of_single_param(parameter, rollouts)
                 print(f"Loss: {loss}")
-                param_err = (parameter - target_parameter).mean()
-                print(f"Parameter error: {param_err}")
 
                 if config.log_wandb:
                     metrics = dict(
@@ -287,7 +282,9 @@ def main(
                         preal_eval_mean=preal_eval[0],
                         preal_eval_std=preal_eval[1],
                         loss=loss,
-                        param_err=param_err,
+                        param_err=(
+                            (parameter - target_parameter) / target_parameter
+                        ).mean(),
                     )
                     wandb.log(metrics)
 
@@ -310,8 +307,6 @@ def main(
                     sim_env_conf.model, parameter
                 )
                 sim_eval_env.env.model = sim_env_conf.model
-
-                del model
 
             if config.log_wandb:
                 wandb.finish()

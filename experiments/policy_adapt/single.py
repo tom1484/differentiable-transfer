@@ -32,9 +32,9 @@ def main(
     override: bool = typer.Option(False, help="Override existing models and logs"),
     debug_nans: bool = typer.Option(False, help="Debug nans"),
 ):
-    from experiments.env import set_jax_config
+    from experiments.env import set_env_vars
 
-    set_jax_config(debug_nans=debug_nans)
+    set_env_vars(jax_debug_nans=debug_nans)
 
     import os
     import wandb
@@ -42,7 +42,7 @@ def main(
     # from sbx import PPO
     from stable_baselines3 import PPO
 
-    from definitions import ROOT_DIR
+    from constants import ROOT_DIR
     from utils.path import get_exp_file_levels, create_exp_assets
 
     from diff_trans.envs.wrapped import get_env

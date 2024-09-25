@@ -21,7 +21,7 @@ class InvertedPendulumConfig_v2(EnvConfig):
     | 4   | damping of the slider             | 1.0       | 0.5 | 1.5  | slide |
     | 5   | damping of the pole rotor         | 1.0       | 0.5 | 1.5  | hinge |
     | 6   | mass of the cart                  | 10.471975 | 5.0 | 15.0 |       |
-    | 7   | mass of the joint                 | 5.0185914 | 2.5 | 7.5  |       |
+    | 7   | mass of the pole                  | 5.0185914 | 2.5 | 7.5  |       |
     """
 
     def __init__(
