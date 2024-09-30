@@ -1,0 +1,20 @@
+{
+    "name": "half_cheetah_0",
+    "exp_start": 0,
+    "num_exp": 6,
+    "env_name": "HalfCheetah-v2",
+    "baseline_round_timesteps": 50000,
+    "baseline_threshold": 500,
+    "baseline_num_envs": 16,
+    "adapt_params": 5,
+    "param_values": 8,
+    "param_deviations": 8,
+    "adapt_train_lr": 0.02,
+    "adapt_timesteps": 500000,
+    "adapt_num_envs": 16,
+    "log_wandb": true,
+    "eval_num_steps": 10000,
+    "eval_num_episodes": 256,
+    "override": false,
+    "debug_nans": false
+}

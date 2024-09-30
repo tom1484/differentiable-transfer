@@ -1,0 +1,21 @@
+{
+    "name": "half_cheetah_1",
+    "gpu": null,
+    "parallel_instances": 3,
+    "num_exp": 6,
+    "start_exp": 0,
+    "env_name": "HalfCheetah-v2",
+    "adapt_params": 5,
+    "param_values": 4.0,
+    "param_deviations": 0,
+    "max_tune_epochs": 10,
+    "loss_rollout_length": 1000,
+    "adapt_learning_rate": 0.05,
+    "adapt_round_timesteps": 50000,
+    "adapt_threshold": 500,
+    "adapt_num_envs": 16,
+    "log_wandb": true,
+    "eval_num_steps": 10000,
+    "eval_num_episodes": 64,
+    "debug_nans": false
+}

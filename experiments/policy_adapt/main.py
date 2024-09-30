@@ -1,5 +1,5 @@
 import typer
-from typing import List, Union, cast, Optional
+from typing import List, Union, cast, Optional, Dict, Any
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 
@@ -15,6 +15,7 @@ class CONFIG:
     num_exp: int = 3
 
     algorithm: str = "PPO"
+    algorithm_config: Optional[Dict[str, Any]] = None
     env_name: str = "InvertedPendulum-v1"
 
     baseline_max_timesteps: int = 1000000
@@ -125,7 +126,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
     # Train baseline model
     model_name = f"{config.algorithm}-{config.env_name}-baseline"
-    model = Algorithm("MlpPolicy", sim_env, verbose=0)
+    model = Algorithm("MlpPolicy", sim_env, verbose=0, **config.algorithm_config)
     model_path = os.path.join(models_dir, f"{model_name}.zip")
 
     if os.path.exists(model_path) and not config.override:
@@ -152,11 +153,9 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
                 },
             )
 
-            def callback_on_log(metrics):
-                if config.log_wandb:
-                    wandb.log(metrics)
-                # else:
-                #     print(metrics)
+        def callback_on_log(metrics):
+            if config.log_wandb:
+                wandb.log(metrics)
 
         callback_on_best = StopTrainingOnRewardThreshold(
             reward_threshold=config.baseline_threshold, verbose=1
@@ -235,7 +234,9 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
             print()
 
             # Load baseline model and adapt to new environment
-            model = Algorithm("MlpPolicy", preal_env, verbose=0)
+            model = Algorithm(
+                "MlpPolicy", preal_env, verbose=0, **config.algorithm_config
+            )
             model = model.load(model_path, preal_env)
 
             # Evaluate initial performance

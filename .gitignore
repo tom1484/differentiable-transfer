@@ -2,7 +2,7 @@ wandb/
 
 models/
 logs/
-configs/
+# configs/
 parallel_tmp/
 *.ipynb
 

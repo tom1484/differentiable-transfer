@@ -1,0 +1,26 @@
+{
+    "name": "half_cheetah_5",
+    "cuda_visible_devices": [0],
+    "exp_start": 0,
+    "num_exp": 6,
+    "algorithm": "PPO",
+    "algorithm_config": {
+        "n_steps": 128
+    },
+    "env_name": "HalfCheetah-v2",
+    "baseline_max_timesteps": 5000000,
+    "baseline_threshold": 500,
+    "baseline_num_envs": 32,
+    "adapt_params": 5,
+    "param_values": 4.0,
+    "param_deviations": 0.0,
+    "adapt_train_lr": 0.02,
+    "adapt_max_timesteps": 1000000,
+    "adapt_threshold": 600,
+    "adapt_num_envs": 32,
+    "eval_num_episodes": 1024,
+    "eval_frequency": 10000,
+    "log_wandb": true,
+    "override": false,
+    "debug_nans": false
+}

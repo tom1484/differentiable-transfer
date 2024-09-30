@@ -1,5 +1,5 @@
 import typer
-from typing import List, Optional, Union, cast
+from typing import List, Optional, Union, cast, Dict, Any
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 
@@ -16,6 +16,7 @@ class CONFIG:
     num_exp: int = 3
 
     algorithm: str = "PPO"
+    algorithm_config: Optional[Dict[str, Any]] = None
     env_name: str = "InvertedPendulum-v1"
 
     adapt_params: Union[None, int, List[int]] = None
@@ -237,7 +238,9 @@ def main(
                 model_name = (
                     f"{config.algorithm}-{config.env_name}-{exp_id:02d}-{i:02d}"
                 )
-                model = Algorithm("MlpPolicy", sim_env, verbose=0)
+                model = Algorithm(
+                    "MlpPolicy", sim_env, verbose=0, **config.algorithm_config
+                )
                 model_path = os.path.join(models_dir, f"{model_name}.zip")
 
                 callback_on_best = StopTrainingOnRewardThreshold(
