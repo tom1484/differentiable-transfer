@@ -141,7 +141,7 @@ def main(
         env_conf = env.env
 
         if parameter is not None:
-            env_conf.model = env_conf.set_parameter(env_conf.model, parameter)
+            env_conf.model = env_conf.set_parameter(parameter)
 
         # env for evaluation
         eval_env = Env(num_envs=config.eval_num_episodes)
@@ -309,9 +309,7 @@ def main(
                 print(f"Preal parameter: {target_parameter}")
                 print()
 
-                sim_env_conf.model = sim_env_conf.set_parameter(
-                    sim_env_conf.model, parameter
-                )
+                sim_env_conf.model = sim_env_conf.set_parameter(parameter)
                 sim_eval_env.env.model = sim_env_conf.model
 
                 del model

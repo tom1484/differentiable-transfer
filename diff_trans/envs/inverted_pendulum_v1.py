@@ -52,7 +52,7 @@ class InvertedPendulumConfig_v1(EnvConfig):
         qpos = self.init_qpos + noise[:2]
         qvel = self.init_qvel + noise[2:]
 
-        return self.data.replace(qpos=qpos, qvel=qvel)
+        return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
         frictionloss = self.model.dof_frictionloss.copy()
@@ -69,20 +69,20 @@ class InvertedPendulumConfig_v1(EnvConfig):
             ]
         )
 
-    def set_parameter(self, env_model: mjx.Model, parameter: jnp.ndarray) -> mjx.Model:
-        frictionloss = env_model.dof_frictionloss
+    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+        frictionloss = self.model.dof_frictionloss
         frictionloss = frictionloss.at[np.array([0, 1])].set(parameter[:2])
 
-        armature = env_model.dof_armature
+        armature = self.model.dof_armature
         armature = armature.at[np.array([0, 1])].set(parameter[2:4])
 
-        damping = env_model.dof_damping
+        damping = self.model.dof_damping
         damping = damping.at[np.array([0, 1])].set(parameter[4:6])
 
-        mass = env_model.body_mass
+        mass = self.model.body_mass
         mass = mass.at[np.array([1, 2])].set(parameter[6:8])
 
-        return env_model.replace(
+        return self.model.replace(
             dof_frictionloss=frictionloss,
             dof_armature=armature,
             dof_damping=damping,

@@ -30,7 +30,7 @@ def single_transition_loss(env: EnvConfig, parameter: jnp.ndarray, trajectories:
     next_observations = jnp.array(next_observations)
     actions = jnp.array(actions)
 
-    model = env.set_parameter(env.model, parameter)
+    model = env.set_parameter(parameter)
     data = env.data
     # _, next_observations_sim = sim.step_at_v(env, model, data, observations, actions)
     # WARNING: Temporary disable for JAX issue

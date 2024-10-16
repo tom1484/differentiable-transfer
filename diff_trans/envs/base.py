@@ -27,6 +27,8 @@ class EnvConfig:
 
         mj_model = mujoco.MjModel.from_xml_path(fullpath)
         mj_data = mujoco.MjData(mj_model)
+        self.mj_model = mj_model
+        self.mj_data = mj_data
 
         self.model = mjx.put_model(mj_model)
         self.data = mjx.put_data(mj_model, mj_data)
@@ -52,6 +54,32 @@ class EnvConfig:
         )
         self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
+    def get_names(self, adr_list: list[int]) -> list[str]:
+        raw_names = self.model.names
+        names = []
+        for adr in adr_list:
+            adr_end = adr + 1
+            while adr_end < len(raw_names) and raw_names[adr_end] != 0:
+                adr_end += 1
+            names.append(raw_names[adr:adr_end].decode())
+            if adr_end >= len(raw_names):
+                break
+        
+        return names
+    
+    def get_body_names(self) -> list[str]:
+        return self.get_names(self.model.name_bodyadr)
+
+    def get_actuator_names(self) -> list[str]:
+        return self.get_names(self.model.name_actuatoradr)
+    
+    def get_joint_names(self) -> list[str]:
+        return self.get_names(self.model.name_jntadr)
+
+    def get_body_com(self, body_name: str) -> jnp.array:
+        idx = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        return self.data.subtree_com[idx]
+
     """
     Methods to be overwritten in the subclass
     """
@@ -62,7 +90,7 @@ class EnvConfig:
     def get_parameter(self) -> jnp.ndarray:
         NotImplementedError()
 
-    def set_parameter(self, env_model: mjx.Model, parameter: jnp.ndarray) -> mjx.Model:
+    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         NotImplementedError()
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
@@ -71,5 +99,5 @@ class EnvConfig:
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         NotImplementedError()
 
-    def _get_obs(self, env_data: mjx.Data) -> np.ndarray:
+    def _get_obs(self, data: mjx.Data) -> np.ndarray:
         NotImplementedError()

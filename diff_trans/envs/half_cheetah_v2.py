@@ -53,7 +53,7 @@ class HalfCheetahConfig_v2(EnvConfig):
         qpos = self.init_qpos + pos_noise
         qvel = self.init_qvel + vel_noise
 
-        return self.data.replace(qpos=qpos, qvel=qvel)
+        return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
         friction = self.model.geom_friction.copy()
@@ -70,20 +70,20 @@ class HalfCheetahConfig_v2(EnvConfig):
             ]
         )
 
-    def set_parameter(self, env_model: mjx.Model, parameter: jnp.ndarray) -> mjx.Model:
-        friction = env_model.geom_friction
+    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+        friction = self.model.geom_friction
         friction = friction.at[0, :1].set(parameter[:1])
 
-        armature = env_model.dof_armature
+        armature = self.model.dof_armature
         armature = armature.at[sidx(3, 6)].set(parameter[1:3])
 
-        damping = env_model.dof_damping
+        damping = self.model.dof_damping
         damping = damping.at[sidx(3, 6)].set(parameter[3:5])
 
-        mass = env_model.body_mass
+        mass = self.model.body_mass
         mass = mass.at[1:2].set(parameter[5:6])
 
-        return env_model.replace(
+        return self.model.replace(
             geom_friction=friction,
             dof_armature=armature,
             dof_damping=damping,

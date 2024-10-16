@@ -110,9 +110,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
         )
 
     target_parameter = default_parameter.at[adapt_param_ids].set(values)
-    preal_env_conf.model = preal_env_conf.set_parameter(
-        preal_env_conf.model, target_parameter
-    )
+    preal_env_conf.model = preal_env_conf.set_parameter(target_parameter)
 
     # Set up evaluation environments
     sim_eval_env = Env(num_envs=config.eval_num_episodes)
