@@ -148,4 +148,4 @@ class InvertedPendulum_v1(BaseEnv):
 
         done = jnp.logical_or(jnp.logical_not(is_finite), jnp.abs(qpos[:, 1]) > 0.2)
 
-        return observation, reward, done
+        return observation, reward, done, [{}] * self.num_env

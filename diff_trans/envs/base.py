@@ -46,6 +46,7 @@ class EnvConfig:
         self.dt = frame_skip * mj_model.opt.timestep
 
         self.reset_vj = jax.jit(jax.vmap(self.reset))
+
         self._state_to_data_vj = jax.jit(
             jax.vmap(self._state_to_data, in_axes=(None, 0))
         )
@@ -53,6 +54,10 @@ class EnvConfig:
             jax.vmap(self._control_to_data, in_axes=(None, 0))
         )
         self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
+
+        # default values
+        self.reset_noise_scale = 0
+        self.parameter_range = jnp.array([[0], [0]])
 
     def get_names(self, adr_list: list[int]) -> list[str]:
         raw_names = self.model.names
@@ -76,9 +81,11 @@ class EnvConfig:
     def get_joint_names(self) -> list[str]:
         return self.get_names(self.model.name_jntadr)
 
-    def get_body_com(self, body_name: str) -> jnp.array:
-        idx = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, body_name)
-        return self.data.subtree_com[idx]
+    def _get_body_com(self, data: mjx.Data, idx: int) -> jnp.array:
+        return data.subtree_com[idx]
+
+    def _get_body_com_batch(self, data: mjx.Data, idx: int) -> jnp.array:
+        return data.subtree_com[:, idx]
 
     """
     Methods to be overwritten in the subclass

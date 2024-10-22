@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, Tuple, List, Type
+from typing import Any, Dict, Optional, Tuple, List, Type
 
 import numpy as np
 
@@ -12,6 +12,7 @@ from stable_baselines3.common import env_util
 
 import jax
 from jax import numpy as jnp
+from mujoco import mjx
 
 from ... import envs
 
@@ -45,7 +46,7 @@ class BaseEnv(VecEnv):
         self.time_start = np.array([time.time() for _ in range(self.num_env)])
 
         return obs
-    
+
     def _reset_all(self) -> np.ndarray:
         rng = jax.random.PRNGKey(time.time_ns())
         rng = jax.random.split(rng, self.num_envs)
@@ -74,7 +75,11 @@ class BaseEnv(VecEnv):
         return np.asarray(obs).copy()
 
     def _update_steps(
-        self, observation: np.ndarray, reward: np.ndarray, done: np.ndarray
+        self,
+        observation: np.ndarray,
+        reward: np.ndarray,
+        done: np.ndarray,
+        info: Optional[Dict] = None,
     ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
         if self.steps.max() >= self.rewards.shape[1]:
             self.rewards = np.hstack([self.rewards, self.rewards])
@@ -86,14 +91,16 @@ class BaseEnv(VecEnv):
         done[self.steps >= self.max_episode_steps] = True
 
         # Calculate episode info for done environments
-        info = [{} for _ in range(self.num_env)]
+        if info is None:
+            info = [{} for _ in range(self.num_env)]
+
         needs_reset = np.zeros(self.num_env, dtype=bool)
         for idx, d in enumerate(done):
             if not d:
                 continue
 
             steps = self.steps[idx]
-            r = self.rewards[idx][: steps]
+            r = self.rewards[idx][:steps]
             t = time.time() - self.time_start[idx]
 
             episode = {}
@@ -104,7 +111,7 @@ class BaseEnv(VecEnv):
             info[idx]["episode"] = episode
 
             needs_reset[idx] = True
-        
+
         # Reset done environments
         reset_num = np.sum(needs_reset.astype(np.int32))
         if reset_num > 0:
@@ -118,12 +125,14 @@ class BaseEnv(VecEnv):
         NotImplementedError()
 
     def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
-        observation, reward, done = self._step_wait()
+        observation, reward, done, info = self._step_wait()
         observation = np.asarray(observation).copy()
         reward = np.asarray(reward).copy()
         done = np.asarray(done).copy()
         # Update the done flag and auto reset the environments if needed
-        observation, done, info = self._update_steps(observation, reward, done)
+        observation, done, info = self._update_steps(
+            observation, reward, done, info=info
+        )
 
         return observation, reward, done, info
 

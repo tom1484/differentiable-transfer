@@ -190,5 +190,5 @@ class HalfCheetah_v1(BaseEnv):
 
         done = jnp.zeros(self.num_env, dtype=bool)
 
-        return observation, reward, done
+        return observation, reward, done, [{}] * self.num_env
   
