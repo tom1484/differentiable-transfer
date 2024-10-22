@@ -7,6 +7,8 @@ from .actor import Actor
 from .critic import Critic
 from .noise import OrnsteinUhlenbeckActionNoise
 
+from diff_trans.envs.wrapped import BaseEnv
+
 
 MAX_STEPS = 50
 TAU = 5e-3
@@ -14,16 +16,15 @@ LEARNING_RATE = 1e-3
 
 
 class Agent:
-    def __init__(self, experiment, batch_size):
-        self._dummy_env = gym.make(experiment)
+    def __init__(self, env: BaseEnv, batch_size: int):
+        self._dummy_env = env
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._sum_writer = SummaryWriter("logs/")
 
         # Hardcoded for now
-        self._dim_state = 25
-        self._dim_goal = 3
-        self._dim_action = self._dummy_env.action_space.shape[0]
-        self._dim_env = 1
+        self._dim_env = env.num_env
+        self._dim_state = env.observation_space.shape[0]
+        self._dim_action = env.action_space.shape[0]
         self._batch_size = batch_size
 
         # agent noise
@@ -31,7 +32,6 @@ class Agent:
 
         self._actor = Actor(
             self._dim_state,
-            self._dim_goal,
             self._dim_action,
             self._dummy_env,
             TAU,
@@ -41,7 +41,6 @@ class Agent:
 
         self._critic = Critic(
             self._dim_state,
-            self._dim_goal,
             self._dim_action,
             self._dim_env,
             self._dummy_env,
@@ -53,7 +52,6 @@ class Agent:
 
         self._actor_target = Actor(
             self._dim_state,
-            self._dim_goal,
             self._dim_action,
             self._dummy_env,
             TAU,
@@ -63,7 +61,6 @@ class Agent:
 
         self._critic_target = Critic(
             self._dim_state,
-            self._dim_goal,
             self._dim_action,
             self._dim_env,
             self._dummy_env,
@@ -89,61 +86,51 @@ class Agent:
     def get_dim_env(self):
         return self._dim_env
 
-    def get_dim_goal(self):
-        return self._dim_goal
-
-    def evaluate_actor(self, actor_predict, obs, goal, history):
+    def evaluate_actor(self, actor_predict, obs, history):
         assert history.shape[0] == MAX_STEPS, "history must be of size MAX_STEPS"
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device).unsqueeze(0)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device).unsqueeze(0)
         history = torch.tensor(history, dtype=torch.float32, device=self._device).unsqueeze(0)
-        return actor_predict(obs, goal, history)
+        return actor_predict(obs, history)
 
-    def evaluate_actor_batch(self, actor_predict, obs, goal, history):
+    def evaluate_actor_batch(self, actor_predict, obs, history):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device)
         history = torch.tensor(history, dtype=torch.float32, device=self._device)
-        return actor_predict(obs, goal, history)
+        return actor_predict(obs, history)
 
-    def evaluate_critic(self, critic_predict, obs, action, goal, history, env):
+    def evaluate_critic(self, critic_predict, obs, action, history, env):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device).unsqueeze(0)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device).unsqueeze(0)
         action = torch.tensor(action, dtype=torch.float32, device=self._device).unsqueeze(0)
         history = torch.tensor(history, dtype=torch.float32, device=self._device).unsqueeze(0)
         env = torch.tensor(env, dtype=torch.float32, device=self._device).unsqueeze(0)
-        return critic_predict(env, obs, goal, action, history)
+        return critic_predict(env, obs, action, history)
 
-    def evaluate_critic_batch(self, critic_predict, obs, action, goal, history, env):
+    def evaluate_critic_batch(self, critic_predict, obs, action, history, env):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device)
         action = torch.tensor(action, dtype=torch.float32, device=self._device)
         history = torch.tensor(history, dtype=torch.float32, device=self._device)
         env = torch.tensor(env, dtype=torch.float32, device=self._device)
-        return critic_predict(env, obs, goal, action, history)
+        return critic_predict(env, obs, action, history)
 
-    def train_critic(self, obs, action, goal, history, env, predicted_q_value):
+    def train_critic(self, obs, action, history, env, predicted_q_value):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device)
         action = torch.tensor(action, dtype=torch.float32, device=self._device)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device)
         history = torch.tensor(history, dtype=torch.float32, device=self._device)
         env = torch.tensor(env, dtype=torch.float32, device=self._device)
         predicted_q_value = torch.tensor(predicted_q_value, dtype=torch.float32, device=self._device)
-        return self._critic.train_critic(env, obs, goal, action, history, predicted_q_value)
+        return self._critic.train_critic(env, obs, action, history, predicted_q_value)
 
-    def train_actor(self, obs, goal, history, a_gradient):
+    def train_actor(self, obs, history, a_gradient):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device)
         history = torch.tensor(history, dtype=torch.float32, device=self._device)
         a_gradient = torch.tensor(a_gradient, dtype=torch.float32, device=self._device)
-        return self._actor.train_network(obs, goal, history, a_gradient)
+        return self._actor.train_network(obs, history, a_gradient)
 
-    def action_gradients_critic(self, obs, action, goal, history, env):
+    def action_gradients_critic(self, obs, action, history, env):
         obs = torch.tensor(obs, dtype=torch.float32, device=self._device)
         action = torch.tensor(action, dtype=torch.float32, device=self._device)
-        goal = torch.tensor(goal, dtype=torch.float32, device=self._device)
         history = torch.tensor(history, dtype=torch.float32, device=self._device)
         env = torch.tensor(env, dtype=torch.float32, device=self._device)
-        return self._critic.action_gradients(env, obs, goal, action, history)
+        return self._critic.action_gradients(env, obs, action, history)
 
     def update_target_actor(self):
         self._actor.update_target_network(self._actor_target)

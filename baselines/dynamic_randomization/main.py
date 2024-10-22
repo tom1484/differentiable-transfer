@@ -11,8 +11,8 @@ from .replay_buffer import Episode, ReplayBuffer
 EPISODES = 1000000
 
 directory = "checkpoints"
-experiment = "FetchSlide2-v1"
-env = gym.make(experiment)
+experiment = "InvertedPendulum-v1"
+randomized_environment = RandomizedEnvironment(experiment)
 
 # Program hyperparameters
 TESTING_INTERVAL = 200  # number of updates between two evaluation of the policy
@@ -29,7 +29,7 @@ K = 0.8  # probability of replay with H.E.R.
 agent = Agent(experiment, BATCH_SIZE * MAX_STEPS)
 
 # Initialize the environment sampler
-randomized_environment = RandomizedEnvironment(experiment, [0.0, 1.0], [])
+# randomized_environment = RandomizedEnvironment(experiment, [0.0, 1.0], [])
 
 # Initialize the replay buffer
 replay_buffer = ReplayBuffer(BUFFER_SIZE)
