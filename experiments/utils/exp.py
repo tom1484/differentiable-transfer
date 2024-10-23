@@ -1,12 +1,10 @@
-import os
-import datetime
+from typing import List, Optional, Tuple, Type, TypeVar, cast
+
 import json
+from jax import numpy as jnp
 
 from constants import ROOT_DIR
-from utils.path import get_exp_file_levels, create_exp_assets
-
-from jax import numpy as jnp
-from typing import List, Optional, Tuple, Type, TypeVar, cast
+from .path import get_exp_file_levels, create_exp_assets
 
 T = TypeVar("T")
 

@@ -42,16 +42,13 @@ class CONFIG:
 # Main entry point for the experiment
 @app.command()
 def main(name: str = typer.Argument(..., help="Name of the experiment")):
-    import json
-    from utils.exp import load_config
+    from experiments.utils.exp import load_config
+    from experiments.env import set_env_vars
 
     config, exp_levels, models_dir = load_config(__file__, name, CONFIG)
-
     if config is None:
         print("Configuration created")
         return
-
-    from experiments.env import set_env_vars
 
     # Set up JAX configuration
     set_env_vars(

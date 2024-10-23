@@ -47,7 +47,7 @@ def main(
     import os
     import datetime
     import json
-    from utils.exp import load_config
+    from experiments.utils.exp import load_config
 
     config, exp_levels, models_dir = load_config(
         __file__, name, CONFIG, config_path=config_path
