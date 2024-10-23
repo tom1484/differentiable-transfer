@@ -1,0 +1,12 @@
+{
+    "cuda_visible_devices": null,
+    "algorithm": "SAC",
+    "algorithm_config": {},
+    "env_name": "Reacher-v1",
+    "num_envs": 256,
+    "timesteps": 1000000,
+    "eval_num_episodes": 1024,
+    "eval_frequency": 50000,
+    "log_wandb": false,
+    "debug_nans": false
+}
