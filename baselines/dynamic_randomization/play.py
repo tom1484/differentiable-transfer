@@ -58,7 +58,7 @@ for test_ep in range(ROLLOUT_NUMBER):
 
         if RENDER:
             env.render()
-        action = agent.evaluate_actor(agent._actor.predict_target, obs, goal, history)
+        action = agent.predict_action_single(agent.actor.predict_target, obs, goal, history)
 
         new_obs_dict, step_reward, done, info = env.step(action[0])
         new_obs_dict = new_obs_dict[0]  # gymnasium returns a tuple, take the first element

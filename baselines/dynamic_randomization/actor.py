@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -18,7 +19,8 @@ class Actor(nn.Module):
         learning_rate: float,
         batch_size: int,
     ):
-        super(Actor, self).__init__()
+        super().__init__()
+
         self._dim_state = dim_state
         self._dim_action = dim_action
         self._action_bound = env.action_space.high
@@ -28,9 +30,12 @@ class Actor(nn.Module):
 
         # Define the network
         self.ff_branch = nn.Sequential(nn.Linear(dim_state, UNITS), nn.ReLU())
-        self.recurrent_branch = nn.LSTM(
-            input_size=dim_state + dim_action, hidden_size=UNITS, batch_first=True
+        self.recurrent_branch = nn.LSTMCell(
+            input_size=dim_state + dim_action, hidden_size=UNITS
         )
+        self.rb_hidden = None
+        self.rb_cell = None
+
         self.merged_branch = nn.Sequential(
             nn.Linear(UNITS * 2, UNITS),
             nn.ReLU(),
@@ -46,24 +51,45 @@ class Actor(nn.Module):
         # Optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=self._learning_rate)
 
-    def forward(self, state: torch.Tensor, memory: torch.Tensor) -> torch.Tensor:
+    def reset_lstm_hidden_state(self, batch_size: int):
+        device = next(self.parameters()).device
+        self.rb_hidden = torch.zeros(batch_size, UNITS, device=device)
+        self.rb_cell = torch.zeros(batch_size, UNITS, device=device)
+
+    def forward(
+        self,
+        state: torch.Tensor,
+        action_old: torch.Tensor,
+        rb_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         ff_out = self.ff_branch(state)
-        recurrent_out, _ = self.recurrent_branch(memory)
-        recurrent_out = recurrent_out[:, -1, :]  # Take the last output of the LSTM
-        merged_out = self.merged_branch(torch.cat([ff_out, recurrent_out], dim=-1))
+
+        x = torch.cat([state, action_old], dim=1)
+
+        if rb_state is None:
+            rb_hidden, rb_cell = self.rb_hidden, self.rb_cell
+            rb_hidden, rb_cell = self.recurrent_branch(x, (rb_hidden, rb_cell))
+            self.rb_hidden, self.rb_cell = rb_hidden, rb_cell
+        else:
+            rb_hidden, rb_cell = rb_state
+            rb_hidden, rb_cell = self.recurrent_branch(x, (rb_hidden, rb_cell))
+
+        recurrent_out = rb_hidden
+
+        merged_out = self.merged_branch(torch.cat([ff_out, recurrent_out], dim=1))
         scaled_out = merged_out * torch.tensor(
             self._action_bound, device=merged_out.device
         )
-        return scaled_out
+        return scaled_out, (rb_hidden, rb_cell)
 
     def train_network(
         self,
-        input_state: torch.Tensor,
-        input_history: torch.Tensor,
+        state: torch.Tensor,
+        action_old: torch.Tensor,
         a_gradient: torch.Tensor,
     ) -> None:
         self.optimizer.zero_grad()
-        predictions = self.forward(input_state, input_history)
+        predictions = self.forward(state, action_old)
         loss = -torch.mean(
             predictions * a_gradient
         )  # Assuming a_gradient is the gradient from the critic
@@ -71,10 +97,13 @@ class Actor(nn.Module):
         self.optimizer.step()
 
     def predict(
-        self, input_state: torch.Tensor, input_history: torch.Tensor
-    ) -> torch.Tensor:
+        self,
+        state: torch.Tensor,
+        action_old: torch.Tensor,
+        rb_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         with torch.no_grad():
-            return self.forward(input_state, input_history)
+            return self.forward(state, action_old, rb_state)
 
     def update_target_network(self, target_actor: nn.Module) -> None:
         for target_param, param in zip(target_actor.parameters(), self.parameters()):
@@ -85,3 +114,28 @@ class Actor(nn.Module):
     def initialize_target_network(self, target_actor: nn.Module) -> None:
         for target_param, param in zip(target_actor.parameters(), self.parameters()):
             target_param.data.copy_(param.data)
+
+
+if __name__ == "__main__":
+    from diff_trans.envs.wrapped import get_env
+    from experiments.env import set_env_vars
+
+    set_env_vars(jax_debug_nans=True)
+
+    Env = get_env("InvertedPendulum-v1")
+    env = Env()
+
+    actor = Actor(
+        env.observation_space.shape[0],
+        env.action_space.shape[0],
+        env,
+        0.005,
+        0.0001,
+        32,
+    )
+
+    obs = env.reset()[0]
+    # action = env.action_space.sample()
+    action = torch.zeros(env.action_space.shape)
+
+    print(actor.predict(torch.tensor(obs), action))

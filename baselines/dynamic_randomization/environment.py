@@ -76,7 +76,7 @@ class RandomizedEnvironment:
         self.parameter_mask = jnp.array(parameter_mask)
         self.parameter_range = self.env.parameter_range
 
-    def sample_env(self) -> Tuple[BaseEnv, jnp.ndarray]:
+    def sample_env(self):
         mini = self.parameter_range[0]
         maxi = self.parameter_range[1]
         value = mini + (maxi - mini) * random.random()
@@ -87,4 +87,5 @@ class RandomizedEnvironment:
         )
         self.env.model = self.env.set_parameter(value)
 
-        return self.gym_env, value
+    def get_env(self) -> Tuple[BaseEnv, jnp.ndarray]:
+        return self.gym_env, self.env.get_parameter()

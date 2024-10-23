@@ -1,6 +1,10 @@
+from typing import Deque, List
+
 from collections import deque
 import random
 import numpy as np
+
+from diff_trans.envs.wrapped.base import BaseEnv
 
 
 class SamplingSizeError(Exception):
@@ -8,7 +12,7 @@ class SamplingSizeError(Exception):
 
 
 class Episode:
-    def __init__(self, goal, env, max_history_timesteps):
+    def __init__(self, env: BaseEnv, max_history_timesteps: int):
         self._states = []
         self._actions = []
         self._rewards = []
@@ -16,19 +20,19 @@ class Episode:
         self._achieved_goals = []
 
         # numpy array that can be used to directly feed the network
-        self._history = []
-        self._dim_history_atom = 0
+        self._dim_history_atom = env.action_space.shape[0] + env.observation_space.shape[0]
+        self._history = np.array(
+            max_history_timesteps * [np.zeros(self._dim_history_atom)]
+        )
 
         self._max_history_timesteps = max_history_timesteps
 
-        self._goal = goal
         self._env = env
 
-    def add_step(self, action, obs, reward, achieved_goal, terminal=False):
-        self._actions.append(action)
+    def add_step(self, obs, reward, action, terminal=False):
         self._states.append(obs)
         self._rewards.append(reward)
-        self._achieved_goals.append(achieved_goal)
+        self._actions.append(action)
 
         # if the history is empty, initialize it using the dims of the action
         # and state provided as arguments
@@ -39,7 +43,7 @@ class Episode:
             )
 
         self._history = np.append(
-            self._history, [np.concatenate((action, obs))], axis=0
+            self._history, [np.concatenate((obs, action))], axis=0
         )[1:]
         self._terminal.append(terminal)
 
@@ -56,18 +60,15 @@ class Episode:
             )
 
             for step in range(max(t - self._max_history_timesteps, 0), t):
-                action = self._actions[step]
                 obs = self._states[step]
+                action = self._actions[step]
 
                 # potential speedup only rewriting the good line instead of creating a new array
-                history = np.append(history, [np.concatenate((action, obs))], axis=0)[
+                history = np.append(history, [np.concatenate((obs, action))], axis=0)[
                     1:
                 ]
 
             return history
-
-    def get_goal(self):
-        return self._goal
 
     def get_terminal(self):
         return self._terminal
@@ -89,16 +90,16 @@ class Episode:
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_size, random_seed=0):
+    def __init__(self, buffer_size: int, random_seed: int = 0):
         self._buffer_size = buffer_size
-        self._buffer = deque()
+        self._buffer: Deque[Episode] = deque()
         self._current_count = 0
         random.seed(random_seed)
 
     def size(self):
         return self._current_count
 
-    def add(self, episode):
+    def add(self, episode: Episode):
         if self._current_count >= self._buffer_size:
             self._buffer.popleft()
             self._current_count -= 1
@@ -106,7 +107,7 @@ class ReplayBuffer:
         self._buffer.append(episode)
         self._current_count += 1
 
-    def sample_batch(self, batch_size):
+    def sample_batch(self, batch_size: int) -> List[Episode]:
         if batch_size > self._current_count:
             raise SamplingSizeError
 

@@ -1,267 +1,253 @@
+from experiments.env import set_env_vars
+
+set_env_vars(jax_debug_nans=True)
+
 import os
 import numpy as np
-import random
 import torch
-import gymnasium as gym
+import torch.nn.functional as F
 
-from .environment import RandomizedEnvironment
-from .agent import Agent
-from .replay_buffer import Episode, ReplayBuffer
+from tqdm import tqdm
 
-EPISODES = 1000000
+from baselines.dynamic_randomization.environment import RandomizedEnvironment
+from baselines.dynamic_randomization.agent import Agent
+from baselines.dynamic_randomization.memory import EpisodicMemory
+from diff_trans.envs.wrapped import get_env
 
-directory = "checkpoints"
-experiment = "InvertedPendulum-v1"
-randomized_environment = RandomizedEnvironment(experiment)
+EPISODES = 2
+
+env_name = "InvertedPendulum-v1"
+Env = get_env(env_name)
+env = Env(max_episode_steps=100)
 
 # Program hyperparameters
-TESTING_INTERVAL = 200  # number of updates between two evaluation of the policy
+TESTING_INTERVAL = 10  # number of updates between two evaluation of the policy
 TESTING_ROLLOUTS = 100  # number of rollouts performed to evaluate the current policy
 
 # Algorithm hyperparameters
 BATCH_SIZE = 32
-BUFFER_SIZE = 1000
-MAX_STEPS = 50  # WARNING: defined in multiple files...
+CAPACITY = 1000000
+MAX_STEPS = 100  # WARNING: defined in multiple files...
 GAMMA = 0.99
-K = 0.8  # probability of replay with H.E.R.
 
 # Initialize the agent, both the actor/critic (and target counterparts) networks
-agent = Agent(experiment, BATCH_SIZE * MAX_STEPS)
+agent = Agent(env, BATCH_SIZE)
 
 # Initialize the environment sampler
-# randomized_environment = RandomizedEnvironment(experiment, [0.0, 1.0], [])
+parameter_mask = np.ones(8, dtype=bool)
+parameter_mask[5] = False
+randomized_environment = RandomizedEnvironment(env_name, parameter_mask=parameter_mask)
 
 # Initialize the replay buffer
-replay_buffer = ReplayBuffer(BUFFER_SIZE)
+# replay_buffer = ReplayBuffer(BUFFER_SIZE)
+# num_updates = 0
+memory = EpisodicMemory(CAPACITY, MAX_STEPS)
 
-if not os.path.exists(directory):
-    os.makedirs(directory)
 
-num_updates = 0
+total_steps = 0
+update_steps = 0
 
-for ep in range(EPISODES):
-    # generate a rollout
+pbar = tqdm(total=CAPACITY, desc="Total Steps")
+while total_steps < CAPACITY:
+    # print(total_steps)
 
     # generate an environment
     randomized_environment.sample_env()
     env, env_params = randomized_environment.get_env()
+    env_params = np.array(env_params)
 
     # reset the environment
-    current_obs_dict = env.reset()[0]  # gymnasium returns a tuple, take the first element
-
-    # read the current goal, and initialize the episode
-    goal = current_obs_dict["desired_goal"]
-    episode = Episode(goal, env_params, MAX_STEPS)
-
-    # get the first observation and first fake "old-action"
-    # TODO: decide if this fake action should be zero or random
-    obs = current_obs_dict["observation"]
-    achieved = current_obs_dict["achieved_goal"]
-    last_action = env.action_space.sample()
-
-    reward = env.compute_reward(achieved, goal, 0)
-
-    episode.add_step(last_action, obs, reward, achieved)
+    obs = env.reset()
+    action_old = torch.zeros(
+        env.action_space.shape, dtype=torch.float32, device="cuda"
+    ).unsqueeze(0)
 
     done = False
-    truncated = False
+
+    agent.reset_lstm_hidden_state(1)
     # rollout the  whole episode
-    while not done and not truncated:
-        obs = current_obs_dict["observation"]
-        history = episode.get_history()
+    while not done:
+        action, _ = agent.predict_action_single(
+            agent.actor.predict,
+            torch.tensor(obs[0], dtype=torch.float32, device="cuda"),
+            action_old[0],
+        )
 
         noise = agent.action_noise()
-        action = agent.evaluate_actor(agent._actor.predict, obs, goal, history).cpu().numpy() + noise
+        action = action + torch.tensor(noise, dtype=torch.float32, device="cuda")
+        # action = env.action_space.sample()
 
-        new_obs_dict, step_reward, done, truncated, info = env.step(action[0])
-        new_obs = new_obs_dict["observation"]
-        achieved = new_obs_dict["achieved_goal"]
+        np_action = action.cpu().numpy()
+        new_obs, step_reward, done, info = env.step(np_action)
+        memory.append(
+            env_params, obs[0], np_action[0], step_reward[0], new_obs[0], done[0]
+        )
+        total_steps += 1
 
-        episode.add_step(action[0], new_obs, step_reward, achieved, terminal=done)
+        obs = new_obs
+        action_old = action
 
-        current_obs_dict = new_obs_dict
+    env.close()
 
-    # store the episode in the replay buffer
-    replay_buffer.add(episode)
+    if len(memory.memory) >= BATCH_SIZE:
+        experiences = memory.sample(BATCH_SIZE)
 
-    # replay the episode with HER with probability k
-    if random.random() < K:
-        new_goal = current_obs_dict["achieved_goal"]
-        replay_episode = Episode(new_goal, env_params, MAX_STEPS)
-        for action, state, achieved_goal, done in zip(
-            episode.get_actions(),
-            episode.get_states(),
-            episode.get_achieved_goals(),
-            episode.get_terminal(),
-        ):
-            # compute the new reward
-            step_reward = env.compute_reward(achieved_goal, new_goal, 0)
-
-            # add the fake transition
-            replay_episode.add_step(
-                action, state, step_reward, achieved_goal, terminal=done
-            )
-
-        replay_buffer.add(replay_episode)
-
-    # close the environment
-    randomized_environment.close_env()
-
-    # perform a batch update of the network if we can sample a big enough batch
-    # from the replay buffer
-
-    if replay_buffer.size() > BATCH_SIZE:
-        episodes = replay_buffer.sample_batch(BATCH_SIZE)
-
-        s_batch = np.zeros([BATCH_SIZE * MAX_STEPS, agent.get_dim_state()])
-        a_batch = np.zeros([BATCH_SIZE * MAX_STEPS, agent.get_dim_action()])
-
-        next_s_batch = np.zeros([BATCH_SIZE * MAX_STEPS, agent.get_dim_state()])
-
-        r_batch = np.zeros([BATCH_SIZE * MAX_STEPS])
-
-        env_batch = np.zeros([BATCH_SIZE * MAX_STEPS, agent.get_dim_env()])
-        goal_batch = np.zeros([BATCH_SIZE * MAX_STEPS, agent.get_dim_goal()])
-
-        history_batch = np.zeros(
-            [
-                BATCH_SIZE * MAX_STEPS,
-                MAX_STEPS,
-                agent.get_dim_action() + agent.get_dim_state(),
-            ]
+        state_batches = np.zeros(
+            [BATCH_SIZE, MAX_STEPS, agent.get_dim_state()], dtype=np.float32
+        )
+        state_next_batches = np.zeros(
+            [BATCH_SIZE, MAX_STEPS, agent.get_dim_state()], dtype=np.float32
         )
 
-        t_batch = []
-
-        for i in range(BATCH_SIZE):
-            s_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                episodes[i].get_states()
-            )[:-1]
-            a_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                episodes[i].get_actions()
-            )[1:]
-            next_s_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                episodes[i].get_states()
-            )[1:]
-            r_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                episodes[i].get_rewards()
-            )[1:]
-
-            env_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                MAX_STEPS * [episodes[i].get_env()]
-            )
-            goal_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                MAX_STEPS * [episodes[i].get_goal()]
-            )
-            history_batch[i * MAX_STEPS : (i + 1) * MAX_STEPS] = np.array(
-                [episodes[i].get_history(t=t) for t in range(1, MAX_STEPS + 1)]
-            )
-
-            # WARNING FIXME: needs padding
-            t_batch += episodes[i].get_terminal()[1:]
-
-        target_action_batch = agent.evaluate_actor_batch(
-            agent._actor_target.predict, next_s_batch, goal_batch, history_batch
-        ).cpu().numpy()
-
-        predicted_actions = agent.evaluate_actor_batch(
-            agent._actor.predict, next_s_batch, goal_batch, history_batch
-        ).cpu().numpy()
-
-        target_q = agent.evaluate_critic_batch(
-            agent._critic_target.predict,
-            next_s_batch,
-            predicted_actions,
-            goal_batch,
-            history_batch,
-            env_batch,
-        ).cpu().numpy()
-
-        y_i = []
-        for k in range(BATCH_SIZE * MAX_STEPS):
-            if t_batch[k]:
-                y_i.append(r_batch[k])
-            else:
-                y_i.append(r_batch[k] + GAMMA * target_q[k])
-
-        predicted_q_value = agent.train_critic(
-            s_batch,
-            a_batch,
-            goal_batch,
-            history_batch,
-            env_batch,
-            np.reshape(y_i, (BATCH_SIZE * MAX_STEPS, 1)),
+        action_batches = np.zeros(
+            [BATCH_SIZE, MAX_STEPS, agent.get_dim_action()], dtype=np.float32
+        )
+        action_old_batches = np.zeros(
+            [BATCH_SIZE, MAX_STEPS, agent.get_dim_action()], dtype=np.float32
         )
 
-        # Update the actor policy using the sampled gradient
-        a_outs = agent.evaluate_actor_batch(
-            agent._actor.predict, s_batch, goal_batch, history_batch
+        reward_batches = np.zeros([BATCH_SIZE, MAX_STEPS], dtype=np.float32)
+        done_batches = np.zeros([BATCH_SIZE, MAX_STEPS], dtype=np.float32)
+
+        env_params_batches = np.zeros(
+            [BATCH_SIZE, MAX_STEPS, agent.get_dim_env()], dtype=np.float32
         )
-        grads = agent.action_gradients_critic(
-            s_batch, a_outs, goal_batch, history_batch, env_batch
+
+        for t in range(len(experiences)):
+            for b, transition in enumerate(experiences[t]):
+                env_params_batches[b, t] = transition.env
+                state_batches[b, t] = transition.state0
+                action_batches[b, t] = transition.action
+                reward_batches[b, t] = transition.reward
+                state_next_batches[b, t] = transition.state1
+                done_batches[b, t] = transition.terminal
+
+            if t > 0:
+                for b, transition in enumerate(experiences[t - 1]):
+                    action_old_batches[b, t] = transition.action
+
+        for t in range(len(experiences) - 1):
+            action_old_batches[:, t + 1] *= (1 - done_batches[:, t])[:, None]
+
+        agent.reset_lstm_hidden_state()
+
+        actor_state = (agent.actor.rb_hidden, agent.actor.rb_cell)
+        critic_state = (agent.critic.rb_hidden, agent.critic.rb_cell)
+        actor_target_state = (agent.actor_target.rb_hidden, agent.actor_target.rb_cell)
+        critic_target_state = (
+            agent.critic_target.rb_hidden,
+            agent.critic_target.rb_cell,
         )
-        agent.train_actor(s_batch, goal_batch, history_batch, grads[0])
 
-        # Update target networks
-        agent.update_target_actor()
-        agent.update_target_critic()
-        
-        num_updates += 1
+        value_loss_total = 0
+        policy_loss_total = 0
 
-    # perform policy evaluation
-    if ep % TESTING_INTERVAL == 0:
-        success_number = 0
+        for t in range(len(experiences)):
+            env_params = torch.tensor(env_params_batches[:, t], device="cuda")
+            state = torch.tensor(state_batches[:, t], device="cuda")
+            action = torch.tensor(action_batches[:, t], device="cuda")
+            reward = torch.tensor(reward_batches[:, t, None], device="cuda")
+            state_next = torch.tensor(state_next_batches[:, t], device="cuda")
+            action_old = torch.tensor(action_old_batches[:, t], device="cuda")
+            done = torch.tensor(done_batches[:, t, None], device="cuda")
 
-        for test_ep in range(TESTING_ROLLOUTS):
-            randomized_environment.sample_env()
-            env, env_params = randomized_environment.get_env()
-
-            current_obs_dict = env.reset()[0]  # gymnasium returns a tuple, take the first element
-
-            # read the current goal, and initialize the episode
-            goal = current_obs_dict["desired_goal"]
-            episode = Episode(goal, env_params, MAX_STEPS)
-
-            # get the first observation and first fake "old-action"
-            # TODO: decide if this fake action should be zero or random
-            obs = current_obs_dict["observation"]
-            achieved = current_obs_dict["achieved_goal"]
-            last_action = env.action_space.sample()
-
-            episode.add_step(last_action, obs, 0, achieved)
-
-            done = False
-            truncated = False
-            # rollout the whole episode
-            while not done and not truncated:
-                obs = current_obs_dict["observation"]
-                history = episode.get_history()
-
-                action = agent.evaluate_actor(
-                    agent._actor_target.predict, obs, goal, history
-                ).cpu().numpy()
-
-                new_obs_dict, step_reward, done, truncated, info = env.step(action[0])
-                new_obs = new_obs_dict["observation"]
-                achieved = new_obs_dict["achieved_goal"]
-
-                episode.add_step(
-                    action[0], new_obs, step_reward, achieved, terminal=done
-                )
-
-                current_obs_dict = new_obs_dict
-
-            if info["is_success"] > 0.0:
-                success_number += 1
-
-            randomized_environment.close_env()
-
-        print(
-            "Testing at episode {}, success rate : {}, num_updates: {}".format(
-                ep, success_number / TESTING_ROLLOUTS, num_updates
+            predicted_target_action, actor_target_state = agent.predict_action(
+                agent.actor_target.predict, state_next, action, actor_target_state
             )
-        )
-        agent.save_model("{}/ckpt_episode_{}".format(directory, ep))
-        agent.update_success(success_number / TESTING_ROLLOUTS, ep)
-        with open("csv_log.csv", "a") as csv_log:
-            csv_log.write("{}; {}; {}\n".format(ep, success_number / TESTING_ROLLOUTS, num_updates))
+            target_q_value, critic_target_state = agent.predict_q(
+                agent.critic_target.predict,
+                env_params,
+                predicted_target_action,
+                state_next,
+                action,
+                critic_target_state,
+            )
+
+            current_q_value, critic_state = agent.predict_q(
+                agent.critic, env_params, action, state, action_old, critic_state
+            )
+            diff_q_value = (reward + GAMMA * target_q_value - current_q_value).detach()
+
+            value_loss_total += diff_q_value * current_q_value / len(experiences)
+
+            # Calculate action gradients
+            predicted_action, _ = agent.predict_action(
+                agent.actor.predict, state, action_old, actor_state
+            )
+            predicted_action.requires_grad = True
+            predicted_q_value, _ = agent.predict_q(
+                agent.critic,
+                env_params,
+                predicted_action,
+                state,
+                action_old,
+                critic_state,
+            )
+            agent.critic.zero_grad()
+            predicted_q_value.backward(
+                torch.ones_like(predicted_q_value),
+                retain_graph=True,
+                inputs=[predicted_action],
+            )
+            action_grad = predicted_action.grad
+
+            # Calculate policy loss
+            prediction, actor_state = agent.predict_action(
+                agent.actor, state, action_old, actor_state
+            )
+            policy_loss_total += action_grad * prediction / len(experiences)
+
+        agent.critic.optimizer.zero_grad()
+        value_grad = value_loss_total.sum().backward()
+        agent.critic.optimizer.step()
+
+        agent.actor.optimizer.zero_grad()
+        policy_grad = policy_loss_total.sum().backward()
+        agent.actor.optimizer.step()
+
+        update_steps += 1
+
+        if update_steps % TESTING_INTERVAL == 0:
+            total_episodic_reward = 0
+            for ep in range(TESTING_ROLLOUTS):
+                # generate an environment
+                randomized_environment.sample_env()
+                env, env_params = randomized_environment.get_env()
+
+                # reset the environment
+                obs = env.reset()
+                action_old = torch.zeros(
+                    env.action_space.shape, dtype=torch.float32, device="cuda"
+                ).unsqueeze(0)
+
+                done = False
+                episodic_reward = 0
+
+                agent.reset_lstm_hidden_state(1)
+                # rollout the  whole episode
+                while not done:
+                    action, _ = agent.predict_action_single(
+                        agent.actor.predict,
+                        torch.tensor(obs[0], dtype=torch.float32, device="cuda"),
+                        action_old[0],
+                    )
+
+                    np_action = action.cpu().numpy()
+                    new_obs, step_reward, done, info = env.step(np_action)
+                    episodic_reward += step_reward
+
+                    obs = new_obs
+                    action_old = action
+
+                env.close()
+                total_episodic_reward += episodic_reward
+
+            print(
+                f"Average episodic reward: {total_episodic_reward / TESTING_ROLLOUTS}"
+            )
+            agent.save_model(
+                f"baselines/dynamic_randomization/checkpoints/model_{update_steps}.pth"
+            )
+
+    pbar.n = total_steps
+    pbar.refresh()
