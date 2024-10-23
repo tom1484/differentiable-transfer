@@ -5,8 +5,8 @@ import gymnasium as gym
 import numpy as np
 import random
 
-from diff_trans.envs.wrapped import BaseEnv
-from diff_trans.envs.wrapped.utils.entry import get_env
+from diff_trans.envs.gym import BaseEnv
+from diff_trans.envs.gym.utils.entry import get_env
 
 # from mujoco._structs import MjModel
 
@@ -64,7 +64,7 @@ class RandomizedEnvironment:
         ENV = get_env(env_name)
 
         self.gym_env = ENV(**kwargs)
-        self.env = self.gym_env.env
+        self.env = self.gym_env.diff_env
 
         default_parameter = self.env.get_parameter()
         if parameter_mask is None:

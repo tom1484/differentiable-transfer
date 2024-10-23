@@ -1,4 +1,4 @@
-from diff_trans.envs.wrapped import register
+from diff_trans.envs.gym import register
 
 from .inverted_pendulum_v1 import DRInvertedPendulum_v1
 

@@ -7,7 +7,7 @@ from jax import lax
 
 from mujoco import mjx
 
-from ..envs import EnvConfig
+from ..envs import BaseDiffEnv
 
 
 def forward(model: mjx.Model, data: mjx.Data, num_steps: int) -> mjx.Data:
@@ -21,7 +21,7 @@ def forward(model: mjx.Model, data: mjx.Data, num_steps: int) -> mjx.Data:
 
 
 def step_at(
-    env: EnvConfig,
+    env: BaseDiffEnv,
     model: mjx.Model,
     data: mjx.Data,
     state: jnp.ndarray,
@@ -37,7 +37,7 @@ def step_at(
 
 
 def step(
-    env: EnvConfig, model: mjx.Model, data: mjx.Data, control: jnp.ndarray
+    env: BaseDiffEnv, model: mjx.Model, data: mjx.Data, control: jnp.ndarray
 ) -> mjx.Data:
     data = env._control_to_data(data, control)
 

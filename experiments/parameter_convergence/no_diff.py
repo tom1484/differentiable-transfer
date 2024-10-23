@@ -27,7 +27,7 @@ def tune(
     from constants import ROOT_DIR
     from utils.path import get_exp_file_levels, create_exp_assets
 
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from diff_trans.utils.loss import single_transition_loss
     from diff_trans.utils.rollout import rollout_transitions
 
@@ -41,8 +41,8 @@ def tune(
     preal_env = env_type(num_envs=train_num_envs)
     env = env_type(num_envs=train_num_envs)
 
-    preal_env_conf = preal_env.env
-    env_conf = env.env
+    preal_env_conf = preal_env.diff_env
+    env_conf = env.diff_env
 
     # Start parameter tuning
     compute_loss_jit = jax.jit(single_transition_loss, static_argnums=0)

@@ -5,10 +5,10 @@ from jax import random, lax
 
 from mujoco import mjx
 
-from .base import EnvConfig
+from .base import BaseDiffEnv
 
 
-class ReacherConfig_v1(EnvConfig):
+class ReacherConfig_v1(BaseDiffEnv):
     """
     ## Parameter Space
 

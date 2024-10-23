@@ -118,7 +118,7 @@ def main(
     # from sbx import PPO
     from stable_baselines3.common.evaluation import evaluate_policy
 
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from diff_trans.utils.loss import single_transition_loss
     from diff_trans.utils.rollout import rollout_transitions, evaluate_policy
     from diff_trans.utils.callbacks import (
@@ -310,7 +310,7 @@ def main(
                 print()
 
                 sim_env_conf.model = sim_env_conf.set_parameter(parameter)
-                sim_eval_env.env.model = sim_env_conf.model
+                sim_eval_env.diff_env.model = sim_env_conf.model
 
                 del model
 

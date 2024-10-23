@@ -1,7 +1,7 @@
 from typing import List
 
-from diff_trans.envs.base import EnvConfig
-from diff_trans.envs.wrapped import BaseEnv
+from diff_trans.envs.base import BaseDiffEnv
+from diff_trans.envs.gym import BaseEnv
 
 
 def generate_trajectory_pair(env0: BaseEnv, env1: BaseEnv, length: int):

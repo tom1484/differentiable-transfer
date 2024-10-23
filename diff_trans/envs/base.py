@@ -8,7 +8,7 @@ import mujoco
 from mujoco import mjx
 
 
-class EnvConfig:
+class BaseDiffEnv:
 
     def __init__(
         self,

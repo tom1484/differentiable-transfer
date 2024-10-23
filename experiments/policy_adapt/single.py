@@ -45,7 +45,7 @@ def main(
     from constants import ROOT_DIR
     from utils.path import get_exp_file_levels, create_exp_assets
 
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
     # Create folders for the experiment
@@ -57,8 +57,8 @@ def main(
     sim_env = Env(num_envs=baseline_num_envs)
     preal_env = Env(num_envs=adapt_num_envs)
 
-    sim_env_conf = sim_env.env
-    preal_env_conf = preal_env.env
+    sim_env_conf = sim_env.diff_env
+    preal_env_conf = preal_env.diff_env
 
     default_parameter = preal_env_conf.get_parameter()
     parameter_range = preal_env_conf.parameter_range
@@ -82,8 +82,8 @@ def main(
     sim_eval_env = Env(num_envs=eval_num_episodes)
     preal_eval_env = Env(num_envs=eval_num_episodes)
     
-    sim_eval_env.env.model = sim_env_conf.model
-    preal_eval_env.env.model = preal_env_conf.model
+    sim_eval_env.diff_env.model = sim_env_conf.model
+    preal_eval_env.diff_env.model = preal_env_conf.model
 
     print(f"Adapting parameter {adapt_param}")
     print(f"Target parameter: {target_param}")

@@ -61,7 +61,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
     from jax import numpy as jnp
 
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
     from diff_trans.utils.callbacks import (
@@ -79,8 +79,8 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     sim_env = Env(num_envs=config.baseline_num_envs)
     preal_env = Env(num_envs=config.adapt_num_envs)
 
-    sim_env_conf = sim_env.env
-    preal_env_conf = preal_env.env
+    sim_env_conf = sim_env.diff_env
+    preal_env_conf = preal_env.diff_env
 
     # Get default parameter and parameter range
     default_parameter = preal_env_conf.get_parameter()
@@ -113,8 +113,8 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     sim_eval_env = Env(num_envs=config.eval_num_episodes)
     preal_eval_env = Env(num_envs=config.eval_num_episodes)
 
-    sim_eval_env.env.model = sim_env_conf.model
-    preal_eval_env.env.model = preal_env_conf.model
+    sim_eval_env.diff_env.model = sim_env_conf.model
+    preal_eval_env.diff_env.model = preal_env_conf.model
 
     print(f"Target parameter: {target_parameter}")
     print(f"Default parameter: {default_parameter}\n")

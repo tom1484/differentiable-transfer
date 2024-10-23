@@ -157,10 +157,10 @@ class Reacher_v1(BaseEnv):
         )
 
     def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
-        vec = self.env._get_body_com_batch(data, 3) - self.env._get_body_com_batch(data, 4)
+        vec = self.diff_env._get_body_com_batch(data, 3) - self.diff_env._get_body_com_batch(data, 4)
 
-        reward_dist = -self.env.reward_dist_weight * jnp.linalg.norm(vec, axis=1)
-        reward_ctrl = -self.env.reward_control_weight * jnp.sum(control**2, axis=1)
+        reward_dist = -self.diff_env.reward_dist_weight * jnp.linalg.norm(vec, axis=1)
+        reward_ctrl = -self.diff_env.reward_control_weight * jnp.sum(control**2, axis=1)
 
         reward = reward_dist + reward_ctrl
         reward_info = [
@@ -177,11 +177,11 @@ class Reacher_v1(BaseEnv):
         data = self._states
         control = self._actions
 
-        data = sim.step_vj(self.env, self.env.model, data, control)
+        data = sim.step_vj(self.diff_env, self.diff_env.model, data, control)
         self._states = data
 
         qpos = data.qpos
-        observation = self.env._get_obs_vj(data)
+        observation = self.diff_env._get_obs_vj(data)
 
         is_finite = jnp.isfinite(qpos).all(axis=1)
         reward, reward_info = self._get_reward(data, control)

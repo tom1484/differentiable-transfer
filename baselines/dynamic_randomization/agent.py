@@ -9,7 +9,7 @@ from .actor import Actor
 from .critic import Critic
 from .noise import OrnsteinUhlenbeckActionNoise
 
-from diff_trans.envs.wrapped import BaseEnv
+from diff_trans.envs.gym import BaseEnv
 
 
 MAX_STEPS = 50
@@ -24,7 +24,7 @@ class Agent:
         self._sum_writer = SummaryWriter("logs/")
 
         # Hardcoded for now
-        self._dim_env = env.env.parameter_range.shape[1]
+        self._dim_env = env.diff_env.parameter_range.shape[1]
         self._dim_state = env.observation_space.shape[0]
         self._dim_action = env.action_space.shape[0]
         self._batch_size = batch_size

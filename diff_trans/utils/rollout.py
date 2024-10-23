@@ -2,7 +2,7 @@ from jax import numpy as jnp
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 
-from ..envs.wrapped import BaseEnv
+from ..envs.gym import BaseEnv
 
 
 def squeeze_array_envs(array: jnp.ndarray):

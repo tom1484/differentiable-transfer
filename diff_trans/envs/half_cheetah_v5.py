@@ -5,11 +5,11 @@ from jax import random
 
 from mujoco import mjx
 
-from .base import EnvConfig
+from .base import BaseDiffEnv
 from .utils.array import sidx
 
 
-class HalfCheetahConfig_v2(EnvConfig):
+class HalfCheetahConfig_v2(BaseDiffEnv):
     """
     ## Parameter Space
 

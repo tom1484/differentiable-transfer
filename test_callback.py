@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from stable_baselines3 import PPO, DDPG
 
 # from stable_baselines3.common.evaluation import evaluate_policy
-from diff_trans.envs.wrapped import get_env, BaseEnv
+from diff_trans.envs.gym import get_env, BaseEnv
 from diff_trans.utils.rollout import evaluate_policy
 from diff_trans import sim
 

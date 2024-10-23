@@ -1,4 +1,4 @@
-from .base import EnvConfig
+from .base import BaseDiffEnv
 
 from .inverted_pendulum_v5 import InvertedPendulumConfig_v1
 # from .inverted_pendulum_v2 import InvertedPendulumConfig_v2

@@ -46,7 +46,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     import os
     import wandb
 
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from diff_trans.utils.rollout import evaluate_policy
     from diff_trans.utils.callbacks import EvalCallback
 
@@ -57,7 +57,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     # Initialize environments and parameters
     Env = get_env(config.env_name)
     env = Env(num_envs=config.num_envs)
-    env_conf = env.env
+    env_conf = env.diff_env
     eval_env = Env(num_envs=config.eval_num_episodes)
 
     # Train baseline model

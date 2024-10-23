@@ -22,7 +22,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class HalfCheetah_v1(BaseEnv):
+class HalfCheetah_v2(BaseEnv):
     """
     ### Description
 
@@ -150,7 +150,7 @@ class HalfCheetah_v1(BaseEnv):
         forward_reward_weight: float = 1.0,
         ctrl_cost_weight: float = 0.1,
     ):
-        env = envs.HalfCheetahConfig_v1()
+        env = envs.HalfCheetahConfig_v2()
 
         observation_space = Box(
             low=-np.inf,
@@ -177,13 +177,13 @@ class HalfCheetah_v1(BaseEnv):
         control = self._actions
 
         qpos_before = jnp.asarray(data.qpos)
-        data = sim.step_vj(self.env, self.env.model, data, control)
+        data = sim.step_vj(self.diff_env, self.diff_env.model, data, control)
         self._states = data
 
         qpos = data.qpos
-        observation = self.env._get_obs_vj(data)
+        observation = self.diff_env._get_obs_vj(data)
 
-        x_velocity = (qpos[:, 0] - qpos_before[:, 0]) / self.env.dt
+        x_velocity = (qpos[:, 0] - qpos_before[:, 0]) / self.diff_env.dt
         forward_reward = self._forward_reward_weight * x_velocity
         ctrl_cost = self._control_cost(control)
         reward = forward_reward - ctrl_cost

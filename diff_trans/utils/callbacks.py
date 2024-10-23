@@ -30,7 +30,7 @@ from stable_baselines3.common.callbacks import BaseCallback, EventCallback, Call
 if TYPE_CHECKING:
     from stable_baselines3.common import base_class
 
-from diff_trans.envs.wrapped import BaseEnv
+from diff_trans.envs.gym import BaseEnv
 from diff_trans.utils.rollout import evaluate_policy
 
 

@@ -5,10 +5,10 @@ from jax import random
 
 from mujoco import mjx
 
-from ..base import EnvConfig
+from ..base import BaseDiffEnv
 
 
-class FetchSlideConfig_v1(EnvConfig):
+class FetchSlideConfig_v1(BaseDiffEnv):
     # TODO: Fill in the parameter range
     """
     ## Parameter Space

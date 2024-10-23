@@ -8,7 +8,7 @@ from tqdm import tqdm
 import numpy as np
 import jax
 from jax import numpy as jnp
-from diff_trans.envs.wrapped import Reacher_v1
+from diff_trans.envs.gym import Reacher_v1
 
 from stable_baselines3 import PPO
 

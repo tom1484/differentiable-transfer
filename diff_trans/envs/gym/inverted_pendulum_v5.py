@@ -137,11 +137,11 @@ class InvertedPendulum_v1(BaseEnv):
         data = self._states
         control = self._actions
 
-        data = sim.step_vj(self.env, self.env.model, data, control)
+        data = sim.step_vj(self.diff_env, self.diff_env.model, data, control)
         self._states = data
 
         qpos = data.qpos
-        observation = self.env._get_obs_vj(data)
+        observation = self.diff_env._get_obs_vj(data)
 
         is_finite = jnp.isfinite(qpos).all(axis=1)
         reward = jnp.ones(self.num_envs, dtype=jnp.float32)

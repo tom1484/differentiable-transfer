@@ -1,7 +1,7 @@
 from jax import numpy as jnp
 from typing import List, Tuple
 
-from diff_trans.envs import EnvConfig
+from diff_trans.envs import BaseDiffEnv
 from diff_trans import sim
 
 
@@ -10,7 +10,7 @@ Trajectory = List[
 ]
 
 
-def single_transition_loss(env: EnvConfig, parameter: jnp.ndarray, trajectories: List[Trajectory]):
+def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectories: List[Trajectory]):
     """
     Compute the loss for a single transition.
     This only works under full observability.

@@ -24,12 +24,12 @@ class BaseEnv(VecEnv):
     def __init__(
         self,
         num_envs: int,
-        env: envs.EnvConfig,
+        diff_env: envs.BaseDiffEnv,
         max_episode_steps: int,
         observation_space: Box,
         action_space: Box,
     ) -> None:
-        self.env = env
+        self.diff_env = diff_env
         self.num_env = num_envs
         self.num_envs = num_envs
 
@@ -51,8 +51,8 @@ class BaseEnv(VecEnv):
         rng = jax.random.PRNGKey(time.time_ns())
         rng = jax.random.split(rng, self.num_envs)
 
-        self._states = self.env.reset_vj(rng)
-        obs = self.env._get_obs_vj(self._states)
+        self._states = self.diff_env.reset_vj(rng)
+        obs = self.diff_env._get_obs_vj(self._states)
 
         return np.asarray(obs).copy()
 
@@ -63,8 +63,8 @@ class BaseEnv(VecEnv):
         rng = jax.random.split(rng, n)
 
         data = self._states
-        new_data = self.env.reset_vj(rng)
-        obs = self.env._get_obs_vj(new_data)
+        new_data = self.diff_env.reset_vj(rng)
+        obs = self.diff_env._get_obs_vj(new_data)
 
         new_qpos = data.qpos.at[at].set(new_data.qpos)
         new_qvel = data.qvel.at[at].set(new_data.qvel)

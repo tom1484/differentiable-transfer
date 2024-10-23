@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from diff_trans.envs.wrapped import BaseEnv
+from diff_trans.envs.gym import BaseEnv
 
 UNITS = 128
 MAX_STEPS = 50
@@ -117,7 +117,7 @@ class Actor(nn.Module):
 
 
 if __name__ == "__main__":
-    from diff_trans.envs.wrapped import get_env
+    from diff_trans.envs.gym import get_env
     from experiments.env import set_env_vars
 
     set_env_vars(jax_debug_nans=True)
