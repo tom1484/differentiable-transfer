@@ -3,7 +3,7 @@
     "gpu": null,
     "exp_start": 3,
     "num_exp": 6,
-    "env_name": "HalfCheetah-v2",
+    "env_name": "HalfCheetah-v5",
     "baseline_round_timesteps": 50000,
     "baseline_threshold": 500,
     "baseline_num_envs": 16,

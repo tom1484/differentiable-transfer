@@ -3,7 +3,7 @@
     "parallel_instances": 2,
     "num_exp": 6,
     "start_exp": 0,
-    "env_name": "HalfCheetah-v2",
+    "env_name": "HalfCheetah-v5",
     "adapt_params": 5,
     "param_values": 8,
     "param_deviations": 8,

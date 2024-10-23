@@ -7,7 +7,7 @@
     "algorithm_config": {
         "n_steps": 128
     },
-    "env_name": "HalfCheetah-v2",
+    "env_name": "HalfCheetah-v5",
     "baseline_max_timesteps": 5000000,
     "baseline_threshold": 500,
     "baseline_num_envs": 32,

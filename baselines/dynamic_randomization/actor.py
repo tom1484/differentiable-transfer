@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     set_env_vars(jax_debug_nans=True)
 
-    Env = get_env("InvertedPendulum-v1")
+    Env = get_env("InvertedPendulum-v5")
     env = Env()
 
     actor = Actor(

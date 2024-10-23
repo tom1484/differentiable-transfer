@@ -8,7 +8,7 @@
     "algorithm_config": {
         "n_steps": 256
     },
-    "env_name": "InvertedPendulum-v1",
+    "env_name": "InvertedPendulum-v5",
     "adapt_params": 3,
     "param_values": 2.0,
     "param_deviations": 0,

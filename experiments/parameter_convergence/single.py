@@ -7,7 +7,7 @@ app = typer.Typer(pretty_exceptions_show_locals=False)
 @app.command()
 def main(
     name: str = typer.Argument(..., help="Name of the experiment"),
-    env_name: str = typer.Option("InvertedPendulum-v1", help="Name of the environment"),
+    env_name: str = typer.Option("InvertedPendulum-v5", help="Name of the environment"),
     start_param: int = typer.Option(0, help="Start index of the parameter"),
     end_param: Optional[int] = typer.Option(None, help="Start index of the parameter"),
     max_tune_epochs: int = typer.Option(5, help="Number of epochs to tune"),

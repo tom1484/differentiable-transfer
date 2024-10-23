@@ -7,7 +7,7 @@ set_env_vars()
 
 def tune(
     name: str = typer.Argument(..., help="Name of the experiment"),
-    env_name: str = typer.Option("InvertedPendulum-v1", help="Name of the environment"),
+    env_name: str = typer.Option("InvertedPendulum-v5", help="Name of the environment"),
     train_num_envs: int = typer.Option(4, help="Number of parallel environments"),
     train_steps: int = typer.Option(5e4, help="Number of sub-steps"),
     evaluate: bool = typer.Option(False, help="Evaluate the model"),

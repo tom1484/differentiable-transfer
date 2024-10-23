@@ -19,7 +19,7 @@ num_envs = 128
 timesteps = 2000000
 eval_timesteps = 100000
 
-env_type = get_env("HalfCheetah-v2")
+env_type = get_env("HalfCheetah-v5")
 env = env_type(num_envs=num_envs, max_episode_steps=1000)
 eval_env = env_type(num_envs=1024, max_episode_steps=1000)
 

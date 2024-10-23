@@ -7,7 +7,7 @@
     "algorithm_config": {
         "n_steps": 128
     },
-    "env_name": "InvertedPendulum-v1",
+    "env_name": "InvertedPendulum-v5",
     "baseline_max_timesteps": 5000000,
     "baseline_threshold": 800,
     "baseline_num_envs": 4,

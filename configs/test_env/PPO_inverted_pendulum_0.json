@@ -1,6 +1,6 @@
 {
     "cuda_visible_devices": null,
-    "algorithm": "SAC",
+    "algorithm": "PPO",
     "algorithm_config": {},
     "env_name": "InvertedPendulum-v5",
     "num_envs": 256,

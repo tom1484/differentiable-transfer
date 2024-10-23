@@ -16,7 +16,7 @@ from diff_trans.envs.wrapped import get_env
 
 EPISODES = 2
 
-env_name = "InvertedPendulum-v1"
+env_name = "InvertedPendulum-v5"
 Env = get_env(env_name)
 env = Env(max_episode_steps=100)
 

@@ -15,7 +15,7 @@ class CONFIG:
     algorithm: str = "PPO"
     algorithm_config: Optional[Dict[str, Any]] = None
 
-    env_name: str = "InvertedPendulum-v1"
+    env_name: str = "InvertedPendulum-v5"
     num_envs: int = 256
 
     timesteps: int = 1000000

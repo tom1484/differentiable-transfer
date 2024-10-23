@@ -8,7 +8,7 @@
     "algorithm_config": {
         "n_steps": 256
     },
-    "env_name": "HalfCheetah-v2",
+    "env_name": "HalfCheetah-v5",
     "adapt_params": 5,
     "param_values": 4.0,
     "param_deviations": 0,

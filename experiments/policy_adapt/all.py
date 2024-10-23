@@ -9,7 +9,7 @@ def main(
     name: str = typer.Argument(..., help="Name of the experiment"),
     exp_start: int = typer.Option(0, help="Start index of the experiment"),
     num_exp: int = typer.Option(3, help="Number of experiments"),
-    env_name: str = typer.Option("InvertedPendulum-v1", help="Name of the environment"),
+    env_name: str = typer.Option("InvertedPendulum-v5", help="Name of the environment"),
     # baseline_timesteps: int = typer.Option(
     #     5e5, help="Number of timesteps to train baseline models"
     # ),

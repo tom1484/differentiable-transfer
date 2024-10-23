@@ -4,7 +4,7 @@
     "exp_start": 0,
     "num_exp": 6,
     "algorithm": "PPO",
-    "env_name": "InvertedPendulum-v1",
+    "env_name": "InvertedPendulum-v5",
     "baseline_max_timesteps": 5000000,
     "baseline_threshold": 800,
     "baseline_num_envs": 64,

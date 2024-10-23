@@ -117,7 +117,7 @@ class HalfCheetah_v2(BaseEnv):
     No additional arguments are currently supported in v2 and lower.
 
     ```
-    env = gym.make('HalfCheetah-v2')
+    env = gym.make('HalfCheetah-v5')
     ```
 
     v3 and v4 take gym.make kwargs such as xml_file, ctrl_cost_weight, reset_noise_scale etc.

@@ -16,7 +16,7 @@ class CONFIG:
     num_exp: int = 3
 
     algorithm: str = "PPO"
-    env_name: str = "InvertedPendulum-v1"
+    env_name: str = "InvertedPendulum-v5"
 
     adapt_params: Union[None, int, List[int]] = None
     param_values: Union[None, float, List[float]] = None

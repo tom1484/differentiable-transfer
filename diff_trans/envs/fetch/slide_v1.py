@@ -21,7 +21,7 @@ class FetchSlideConfig_v1(EnvConfig):
     def __init__(
         self,
         frame_skip: int = 2,
-        reset_noise_scale: float = 0.1,
+        reset_noise_scale: float = 0.01,
     ):
         observation_dim = 18
         super().__init__(
