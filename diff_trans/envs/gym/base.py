@@ -174,3 +174,6 @@ class BaseEnv(VecEnv):
         num = self._get_indices_len(indices)
         result = env_util.is_wrapped(self, wrapper_class)
         return [result for _ in range(num)]
+
+    def get_state_vector(self, data: mjx.Data) -> jnp.ndarray:
+        return self.diff_env._get_state_vector_batch(data)

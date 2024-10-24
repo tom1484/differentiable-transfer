@@ -139,6 +139,8 @@ class Reacher_v1(BaseEnv):
         self,
         num_envs: int = 1,
         max_episode_steps: int = 1000,
+        reward_dist_weight: float = 1,
+        reward_control_weight: float = 1,
     ):
         env = envs.ReacherConfig_v1()
 
@@ -156,11 +158,14 @@ class Reacher_v1(BaseEnv):
             num_envs, env, max_episode_steps, observation_space, action_space
         )
 
+        self._reward_dist_weight = reward_dist_weight
+        self._reward_control_weight = reward_control_weight
+
     def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
         vec = self.diff_env._get_body_com_batch(data, 3) - self.diff_env._get_body_com_batch(data, 4)
 
-        reward_dist = -self.diff_env.reward_dist_weight * jnp.linalg.norm(vec, axis=1)
-        reward_ctrl = -self.diff_env.reward_control_weight * jnp.sum(control**2, axis=1)
+        reward_dist = -self._reward_dist_weight * jnp.linalg.norm(vec, axis=1)
+        reward_ctrl = -self._reward_control_weight * jnp.sum(control**2, axis=1)
 
         reward = reward_dist + reward_ctrl
         reward_info = [
