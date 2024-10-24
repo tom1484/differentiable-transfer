@@ -16,7 +16,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class InvertedPendulum_v1(BaseEnv):
+class InvertedPendulum_v5(BaseEnv):
     """
     ## Description
     This environment is the Cartpole environment, based on the work of Barto, Sutton, and Anderson in ["Neuronlike adaptive elements that can solve difficult learning control problems"](https://ieeexplore.ieee.org/document/6313077),
@@ -116,22 +116,24 @@ class InvertedPendulum_v1(BaseEnv):
         self,
         num_envs: int = 1,
         max_episode_steps: int = 1000,
+        reset_noise_scale: float = 0.02,
     ):
-        env = envs.DiffInvertedPendulum_v1()
+        diff_env = envs.DiffInvertedPendulum_v5(reset_noise_scale=reset_noise_scale)
+        self.diff_env = diff_env
+
+        self._reset_noise_scale = reset_noise_scale
 
         observation_space = Box(
             low=-np.inf,
             high=np.inf,
-            shape=(env.state_dim,),
+            shape=(diff_env.state_dim,),
             dtype=np.float32,
         )
         action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
+            low=diff_env.control_range[0], high=diff_env.control_range[1], dtype=np.float32
         )
 
-        super().__init__(
-            num_envs, env, max_episode_steps, observation_space, action_space
-        )
+        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
 
     def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         data = self._states

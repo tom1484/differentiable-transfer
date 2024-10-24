@@ -38,8 +38,9 @@ class DiffAnt_v5(BaseDiffEnv):
     def __init__(
         self,
         frame_skip: int = 2,
-        # exclude_current_positions_from_observation: bool = True,
-        # include_cfrc_ext_in_observation: bool = True,
+        reset_noise_scale: float = 0.1,
+        exclude_current_positions_from_observation: bool = True,
+        include_cfrc_ext_in_observation: bool = True,
     ):
         observation_dim = 29
 
@@ -49,10 +50,11 @@ class DiffAnt_v5(BaseDiffEnv):
             observation_dim,
         )
 
-        # self._exclude_current_positions_from_observation = (
-        #     exclude_current_positions_from_observation
-        # )
-        # self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
+        self._reset_noise_scale = reset_noise_scale
+        self._exclude_current_positions_from_observation = (
+            exclude_current_positions_from_observation
+        )
+        self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
         # fmt: off
         self.parameter_range = jnp.array(
@@ -74,13 +76,13 @@ class DiffAnt_v5(BaseDiffEnv):
         # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
-        noise_low = -self.reset_noise_scale
-        noise_high = self.reset_noise_scale
+        noise_low = -self._reset_noise_scale
+        noise_high = self._reset_noise_scale
 
         qpos = self.init_qpos + random.uniform(
             key, shape=(self.model.nq,), minval=noise_low, maxval=noise_high
         )
-        qvel = self.init_qvel + self.reset_noise_scale * random.normal(
+        qvel = self.init_qvel + self._reset_noise_scale * random.normal(
             key, shape=(self.model.nv,)
         )
 

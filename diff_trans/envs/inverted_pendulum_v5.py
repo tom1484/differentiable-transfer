@@ -8,7 +8,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class DiffInvertedPendulum_v1(BaseDiffEnv):
+class DiffInvertedPendulum_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
@@ -32,7 +32,7 @@ class DiffInvertedPendulum_v1(BaseDiffEnv):
         observation_dim = 4
         super().__init__("inverted_pendulum.xml", frame_skip, observation_dim)
 
-        self.reset_noise_scale = reset_noise_scale
+        self._reset_noise_scale = reset_noise_scale
 
         # fmt: off
         self.parameter_range = jnp.array(
@@ -54,8 +54,8 @@ class DiffInvertedPendulum_v1(BaseDiffEnv):
         # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
-        noise_low = -self.reset_noise_scale
-        noise_high = self.reset_noise_scale
+        noise_low = -self._reset_noise_scale
+        noise_high = self._reset_noise_scale
 
         noise = random.uniform(
             key, shape=(2 * self.model.nq,), minval=noise_low, maxval=noise_high

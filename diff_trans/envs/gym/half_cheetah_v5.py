@@ -22,7 +22,7 @@ DEFAULT_CAMERA_CONFIG = {
 }
 
 
-class HalfCheetah_v2(BaseEnv):
+class HalfCheetah_v5(BaseEnv):
     """
     ### Description
 
@@ -149,26 +149,29 @@ class HalfCheetah_v2(BaseEnv):
         max_episode_steps: int = 1000,
         forward_reward_weight: float = 1.0,
         ctrl_cost_weight: float = 0.1,
+        reset_noise_scale: float = 0.1,
     ):
-        env = envs.DiffHalfCheetah_v2()
+        diff_env = envs.DiffHalfCheetah_v5(reset_noise_scale=reset_noise_scale)
+        self.diff_env = diff_env
+
+        self._forward_reward_weight = forward_reward_weight
+        self._ctrl_cost_weight = ctrl_cost_weight
+        self._reset_noise_scale = reset_noise_scale
 
         observation_space = Box(
             low=-np.inf,
             high=np.inf,
-            shape=(env.state_dim,),
+            shape=(diff_env.state_dim,),
             dtype=np.float32,
         )
         action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
+            low=diff_env.control_range[0],
+            high=diff_env.control_range[1],
+            dtype=np.float32,
         )
 
-        super().__init__(
-            num_envs, env, max_episode_steps, observation_space, action_space
-        )
+        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
 
-        self._forward_reward_weight = forward_reward_weight
-        self._ctrl_cost_weight = ctrl_cost_weight
-    
     def _control_cost(self, actions: jnp.ndarray) -> jnp.ndarray:
         return self._ctrl_cost_weight * jnp.sum(jnp.square(actions), axis=1)
 
@@ -191,4 +194,3 @@ class HalfCheetah_v2(BaseEnv):
         done = jnp.zeros(self.num_env, dtype=bool)
 
         return observation, reward, done, [{}] * self.num_env
-  

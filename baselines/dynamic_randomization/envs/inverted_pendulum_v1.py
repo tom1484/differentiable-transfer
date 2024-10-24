@@ -1,10 +1,10 @@
-from diff_trans.envs.gym import InvertedPendulum_v1
+from diff_trans.envs.gym import InvertedPendulum_v5
 from .base import DREnv
 
 
-class DRInvertedPendulum_v1(InvertedPendulum_v1, DREnv):
+class DRInvertedPendulum_v1(InvertedPendulum_v5, DREnv):
     def __init__(self, *args, eval_args=None, **kwargs):
-        super(InvertedPendulum_v1, self).__init__(*args, **kwargs)
+        super(InvertedPendulum_v5, self).__init__(*args, **kwargs)
         self.eval_args = eval_args
 
     def sample_goal(self):

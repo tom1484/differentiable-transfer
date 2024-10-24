@@ -8,7 +8,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class DiffReacher_v1(BaseDiffEnv):
+class DiffReacher_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
@@ -23,10 +23,7 @@ class DiffReacher_v1(BaseDiffEnv):
     | 6   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
     """
 
-    def __init__(
-        self,
-        frame_skip: int = 2,
-    ):
+    def __init__(self, frame_skip: int = 2):
         observation_dim = 10
         super().__init__(
             "reacher.xml",

@@ -25,12 +25,10 @@ class BaseEnv(VecEnv):
     def __init__(
         self,
         num_envs: int,
-        diff_env: envs.BaseDiffEnv,
         max_episode_steps: int,
         observation_space: Box,
         action_space: Box,
     ) -> None:
-        self.diff_env = diff_env
         self.num_env = num_envs
         self.num_envs = num_envs
 

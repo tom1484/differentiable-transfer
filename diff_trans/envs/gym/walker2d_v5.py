@@ -26,21 +26,11 @@ class Walker2d_v5(BaseEnv):
         reset_noise_scale: float = 5e-3,
         exclude_current_positions_from_observation: bool = True,
     ):
-        env = envs.DiffWalker2d_v5()
-
-        observation_space = Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(env.state_dim,),
-            dtype=np.float32,
+        diff_env = envs.DiffWalker2d_v5(
+            reset_noise_scale=reset_noise_scale,
+            exclude_current_positions_from_observation=exclude_current_positions_from_observation,
         )
-        action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
-        )
-
-        super().__init__(
-            num_envs, env, max_episode_steps, observation_space, action_space
-        )
+        self.diff_env = diff_env
 
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
@@ -52,6 +42,20 @@ class Walker2d_v5(BaseEnv):
         self._exclude_current_positions_from_observation = (
             exclude_current_positions_from_observation
         )
+
+        observation_space = Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(diff_env.state_dim,),
+            dtype=np.float32,
+        )
+        action_space = Box(
+            low=diff_env.control_range[0],
+            high=diff_env.control_range[1],
+            dtype=np.float32,
+        )
+
+        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
 
     def healthy_reward(self, data: mjx.Data) -> jnp.ndarray:
         return self.is_healthy(data) * self._healthy_reward
@@ -116,7 +120,8 @@ class Walker2d_v5(BaseEnv):
         )
 
         terminated = jnp.logical_and(
-            jnp.logical_not(self.is_healthy(data)), self._terminate_when_unhealthy
+            jnp.logical_not(self.is_healthy(data)),
+            self._terminate_when_unhealthy,
         )
 
         return observation, reward, terminated, info

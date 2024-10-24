@@ -9,7 +9,7 @@ from .base import BaseDiffEnv
 from .utils.array import sidx
 
 
-class DiffHalfCheetah_v2(BaseDiffEnv):
+class DiffHalfCheetah_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
@@ -35,7 +35,7 @@ class DiffHalfCheetah_v2(BaseDiffEnv):
             observation_dim,
         )
 
-        self.reset_noise_scale = reset_noise_scale
+        self._reset_noise_scale = reset_noise_scale
 
         # fmt: off
         self.parameter_range = jnp.array(
@@ -57,13 +57,13 @@ class DiffHalfCheetah_v2(BaseDiffEnv):
         # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
-        noise_low = -self.reset_noise_scale
-        noise_high = self.reset_noise_scale
+        noise_low = -self._reset_noise_scale
+        noise_high = self._reset_noise_scale
 
         pos_noise = random.uniform(
             key, shape=(self.model.nq,), minval=noise_low, maxval=noise_high
         )
-        vel_noise = self.reset_noise_scale * random.normal(key, shape=(self.model.nv,))
+        vel_noise = self._reset_noise_scale * random.normal(key, shape=(self.model.nv,))
 
         qpos = self.init_qpos + pos_noise
         qvel = self.init_qvel + vel_noise

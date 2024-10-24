@@ -11,7 +11,7 @@ from .base import BaseEnv
 from ... import envs, sim
 
 
-class Reacher_v1(BaseEnv):
+class Reacher_v5(BaseEnv):
     """
     ## Description
     "Reacher" is a two-jointed robot arm.
@@ -142,24 +142,25 @@ class Reacher_v1(BaseEnv):
         reward_dist_weight: float = 1,
         reward_control_weight: float = 1,
     ):
-        env = envs.DiffReacher_v1()
+        diff_env = envs.DiffReacher_v5()
+        self.diff_env = diff_env
+
+        self._reward_dist_weight = reward_dist_weight
+        self._reward_control_weight = reward_control_weight
 
         observation_space = Box(
             low=-np.inf,
             high=np.inf,
-            shape=(env.state_dim,),
+            shape=(diff_env.state_dim,),
             dtype=np.float32,
         )
         action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
+            low=diff_env.control_range[0],
+            high=diff_env.control_range[1],
+            dtype=np.float32,
         )
 
-        super().__init__(
-            num_envs, env, max_episode_steps, observation_space, action_space
-        )
-
-        self._reward_dist_weight = reward_dist_weight
-        self._reward_control_weight = reward_control_weight
+        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
 
     def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
         vec = self.diff_env._get_body_com_batch(

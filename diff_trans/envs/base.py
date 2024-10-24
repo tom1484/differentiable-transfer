@@ -57,7 +57,7 @@ class BaseDiffEnv:
         self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
         # default values
-        self.reset_noise_scale = 0
+        self._reset_noise_scale = 0
         self.parameter_range = jnp.array([[0], [0]])
 
     def _get_body_com(self, data: mjx.Data, idx: int) -> jnp.ndarray:

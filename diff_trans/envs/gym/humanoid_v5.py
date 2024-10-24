@@ -210,21 +210,15 @@ class Humanoid_v5(BaseEnv):
         include_qfrc_actuator_in_observation: bool = True,
         include_cfrc_ext_in_observation: bool = True,
     ):
-        env = envs.DiffHumanoid_v5()
-
-        observation_space = Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(env.state_dim,),
-            dtype=np.float32,
+        diff_env = envs.DiffHumanoid_v5(
+            reset_noise_scale=reset_noise_scale,
+            exclude_current_positions_from_observation=exclude_current_positions_from_observation,
+            include_cinert_in_observation=include_cinert_in_observation,
+            include_cvel_in_observation=include_cvel_in_observation,
+            include_qfrc_actuator_in_observation=include_qfrc_actuator_in_observation,
+            include_cfrc_ext_in_observation=include_cfrc_ext_in_observation,
         )
-        action_space = Box(
-            low=env.control_range[0], high=env.control_range[1], dtype=np.float32
-        )
-
-        super().__init__(
-            num_envs, env, max_episode_steps, observation_space, action_space
-        )
+        self.diff_env = diff_env
 
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
@@ -244,6 +238,20 @@ class Humanoid_v5(BaseEnv):
         )
         self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
+        observation_space = Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(diff_env.state_dim,),
+            dtype=np.float32,
+        )
+        action_space = Box(
+            low=diff_env.control_range[0],
+            high=diff_env.control_range[1],
+            dtype=np.float32,
+        )
+
+        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
+
     def healthy_reward(self, data: mjx.Data) -> jnp.ndarray:
         return self.is_healthy(data) * self._healthy_reward
 
@@ -260,7 +268,7 @@ class Humanoid_v5(BaseEnv):
 
     def contact_cost(self, data: mjx.Data) -> jnp.ndarray:
         contact_cost = self._contact_cost_weight * jnp.sum(
-            jnp.square(self.contact_forces(data))
+            jnp.square(self.contact_forces(data)), axis=1
         )
         return contact_cost
 
@@ -313,13 +321,16 @@ class Humanoid_v5(BaseEnv):
         observation = self.diff_env._get_obs_vj(data)
         reward, reward_info = self._get_reward(data, x_velocity, control)
 
-        info = {
-            # TODO: add more info
-            **reward_info,
-        }
+        info = self.reshape_info(
+            {
+                # TODO: add more info
+                **reward_info,
+            }
+        )
 
         terminated = jnp.logical_and(
-            jnp.logical_not(self.is_healthy(data)), self._terminate_when_unhealthy
+            jnp.logical_not(self.is_healthy(data)),
+            self.diff_env._terminate_when_unhealthy,
         )
 
         return observation, reward, terminated, info
