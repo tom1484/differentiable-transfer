@@ -1,3 +1,4 @@
+from pprint import pformat
 import time
 from typing import Any, Dict, Optional, Tuple, List, Type
 
@@ -177,3 +178,9 @@ class BaseEnv(VecEnv):
 
     def get_state_vector(self, data: mjx.Data) -> jnp.ndarray:
         return self.diff_env._get_state_vector_batch(data)
+
+    def reshape_info(self, info: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return [
+            dict([item[0], item[1][e]] for item in info.items())
+            for e in range(self.num_envs)
+        ]

@@ -117,7 +117,7 @@ class InvertedPendulum_v1(BaseEnv):
         num_envs: int = 1,
         max_episode_steps: int = 1000,
     ):
-        env = envs.InvertedPendulumConfig_v1()
+        env = envs.DiffInvertedPendulum_v1()
 
         observation_space = Box(
             low=-np.inf,

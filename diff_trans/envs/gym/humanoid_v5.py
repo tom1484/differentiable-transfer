@@ -11,7 +11,7 @@ from .base import BaseEnv
 from ... import envs, sim
 
 
-class Ant_v5(BaseEnv):
+class Humanoid_v5(BaseEnv):
     """
     ## Description
     This environment is based on the one introduced by Schulman, Moritz, Levine, Jordan, and Abbeel in ["High-Dimensional Continuous Control Using Generalized Advantage Estimation"](https://arxiv.org/abs/1506.02438).
@@ -196,16 +196,21 @@ class Ant_v5(BaseEnv):
         self,
         num_envs: int = 1,
         max_episode_steps: int = 1000,
-        forward_reward_weight: float = 1,
-        ctrl_cost_weight: float = 0.5,
-        contact_cost_weight: float = 5e-4,
-        healthy_reward: float = 1.0,
-        main_body: Union[int, str] = 1,
+        forward_reward_weight: float = 1.25,
+        ctrl_cost_weight: float = 0.1,
+        contact_cost_weight: float = 5e-7,
+        contact_cost_range: Tuple[float, float] = (-np.inf, 10.0),
+        healthy_reward: float = 5.0,
         terminate_when_unhealthy: bool = True,
-        healthy_z_range: Tuple[float, float] = (0.2, 1.0),
-        contact_force_range: Tuple[float, float] = (-1.0, 1.0),
+        healthy_z_range: Tuple[float, float] = (1.0, 2.0),
+        reset_noise_scale: float = 1e-2,
+        exclude_current_positions_from_observation: bool = True,
+        include_cinert_in_observation: bool = True,
+        include_cvel_in_observation: bool = True,
+        include_qfrc_actuator_in_observation: bool = True,
+        include_cfrc_ext_in_observation: bool = True,
     ):
-        env = envs.DiffAnt_v5()
+        env = envs.DiffHumanoid_v5()
 
         observation_space = Box(
             low=-np.inf,
@@ -224,11 +229,20 @@ class Ant_v5(BaseEnv):
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
         self._contact_cost_weight = contact_cost_weight
+        self._contact_cost_range = contact_cost_range
         self._healthy_reward = healthy_reward
-        self._main_body = main_body
         self._terminate_when_unhealthy = terminate_when_unhealthy
         self._healthy_z_range = healthy_z_range
-        self._contact_force_range = contact_force_range
+        self._reset_noise_scale = reset_noise_scale
+        self._exclude_current_positions_from_observation = (
+            exclude_current_positions_from_observation
+        )
+        self._include_cinert_in_observation = include_cinert_in_observation
+        self._include_cvel_in_observation = include_cvel_in_observation
+        self._include_qfrc_actuator_in_observation = (
+            include_qfrc_actuator_in_observation
+        )
+        self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
     def healthy_reward(self, data: mjx.Data) -> jnp.ndarray:
         return self.is_healthy(data) * self._healthy_reward

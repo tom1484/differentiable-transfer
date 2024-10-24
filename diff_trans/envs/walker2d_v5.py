@@ -1,5 +1,6 @@
 from typing import Tuple, Union
 
+from jinja2 import pass_eval_context
 import numpy as np
 from jax import numpy as jnp
 from jax import random, lax
@@ -9,7 +10,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class DiffAnt_v5(BaseDiffEnv):
+class DiffWalker2d_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
@@ -44,7 +45,7 @@ class DiffAnt_v5(BaseDiffEnv):
         observation_dim = 29
 
         super().__init__(
-            "ant.xml",
+            "walker2d.xml",
             frame_skip,
             observation_dim,
         )
@@ -80,74 +81,64 @@ class DiffAnt_v5(BaseDiffEnv):
         qpos = self.init_qpos + random.uniform(
             key, shape=(self.model.nq,), minval=noise_low, maxval=noise_high
         )
-        qvel = self.init_qvel + self.reset_noise_scale * random.normal(
-            key, shape=(self.model.nv,)
+        qvel = self.init_qvel + random.uniform(
+            key, shape=(self.model.nv,), minval=noise_low, maxval=noise_high
         )
 
         return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
-        friction = self.model.geom_friction.copy()
-        armature = self.model.dof_armature.copy()
-        damping = self.model.dof_damping.copy()
-        mass = self.model.body_mass.copy()
+        # friction = self.model.geom_friction.copy()
+        # armature = self.model.dof_armature.copy()
+        # damping = self.model.dof_damping.copy()
+        # mass = self.model.body_mass.copy()
 
-        return jnp.concatenate(
-            [
-                friction[0, 0:1],
-                armature[6:14],
-                damping[6:14],
-                mass[1:2],
-            ]
-        )
+        # return jnp.concatenate(
+        #     [
+        #         friction[0, 0:1],
+        #         armature[6:14],
+        #         damping[6:14],
+        #         mass[1:2],
+        #     ]
+        # )
+        pass
 
     def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
-        friction = self.model.geom_friction
-        friction = friction.at[0, :1].set(parameter[:1])
+        # friction = self.model.geom_friction
+        # friction = friction.at[0, :1].set(parameter[:1])
 
-        armature = self.model.dof_armature
-        armature = armature.at[6:14].set(parameter[1:9])
+        # armature = self.model.dof_armature
+        # armature = armature.at[6:14].set(parameter[1:9])
 
-        damping = self.model.dof_damping
-        damping = damping.at[6:14].set(parameter[9:17])
+        # damping = self.model.dof_damping
+        # damping = damping.at[6:14].set(parameter[9:17])
 
-        mass = self.model.body_mass
-        mass = mass.at[1:2].set(parameter[17:18])
+        # mass = self.model.body_mass
+        # mass = mass.at[1:2].set(parameter[17:18])
 
-        return self.model.replace(
-            geom_friction=friction,
-            dof_armature=armature,
-            dof_damping=damping,
-            body_mass=mass,
-        )
+        # return self.model.replace(
+        #     geom_friction=friction,
+        #     dof_armature=armature,
+        #     dof_damping=damping,
+        #     body_mass=mass,
+        # )
+        pass
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
-        qpos = states[:15]
-        qvel = states[15:29]
+        # qpos = states[:15]
+        # qvel = states[15:29]
 
-        return data.replace(qpos=qpos, qvel=qvel)
+        # return data.replace(qpos=qpos, qvel=qvel)
+        pass
 
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         return data.replace(ctrl=control)
 
-    # def contact_forces(self, data: mjx.Data) -> jnp.ndarray:
-    #     raw_contact_forces = data.cfrc_ext.flatten()
-    #     min_value, max_value = self._contact_force_range
-    #     contact_forces = jnp.clip(raw_contact_forces, min_value, max_value)
-
-    #     return contact_forces
-
     def _get_obs(self, data: mjx.Data) -> np.ndarray:
         qpos = data.qpos
-        qvel = data.qvel
+        qvel = jnp.clip(data.qvel, -10, 10)
 
         # if self._exclude_current_positions_from_observation:
-        #     qpos = qpos[2:]
-
-        # if self._include_cfrc_ext_in_observation:
-        #     contact_force = self.contact_forces(data)[1:]
-        #     return jnp.concatenate([qpos, qvel, contact_force])
-        # else:
-        #     return jnp.concatenate([qpos, qvel])
+        #     qpos = qpos[1:]
 
         return jnp.concatenate([qpos, qvel])

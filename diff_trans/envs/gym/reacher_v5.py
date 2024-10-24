@@ -142,7 +142,7 @@ class Reacher_v1(BaseEnv):
         reward_dist_weight: float = 1,
         reward_control_weight: float = 1,
     ):
-        env = envs.ReacherConfig_v1()
+        env = envs.DiffReacher_v1()
 
         observation_space = Box(
             low=-np.inf,
@@ -162,19 +162,18 @@ class Reacher_v1(BaseEnv):
         self._reward_control_weight = reward_control_weight
 
     def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
-        vec = self.diff_env._get_body_com_batch(data, 3) - self.diff_env._get_body_com_batch(data, 4)
+        vec = self.diff_env._get_body_com_batch(
+            data, 3
+        ) - self.diff_env._get_body_com_batch(data, 4)
 
         reward_dist = -self._reward_dist_weight * jnp.linalg.norm(vec, axis=1)
         reward_ctrl = -self._reward_control_weight * jnp.sum(control**2, axis=1)
 
         reward = reward_dist + reward_ctrl
-        reward_info = [
-            {
-                "reward_dist": dist,
-                "reward_ctrl": ctrl,
-            }
-            for dist, ctrl in zip(reward_dist, reward_ctrl)
-        ]
+        reward_info = {
+            "reward_dist": reward_dist,
+            "reward_ctrl": reward_ctrl,
+        }
 
         return reward, reward_info
 
@@ -191,6 +190,13 @@ class Reacher_v1(BaseEnv):
         is_finite = jnp.isfinite(qpos).all(axis=1)
         reward, reward_info = self._get_reward(data, control)
 
+        info = self.reshape_info(
+            {
+                # TODO: Add more info
+                **reward_info
+            }
+        )
+
         done = jnp.logical_or(jnp.logical_not(is_finite), jnp.abs(qpos[:, 1]) > 0.2)
 
-        return observation, reward, done, reward_info
+        return observation, reward, done, info

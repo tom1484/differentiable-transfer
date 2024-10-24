@@ -8,7 +8,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class InvertedPendulumConfig_v1(BaseDiffEnv):
+class DiffInvertedPendulum_v1(BaseDiffEnv):
     """
     ## Parameter Space
 

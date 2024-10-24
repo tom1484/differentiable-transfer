@@ -6,7 +6,7 @@
     "algorithm_config": {
         "n_steps": 256
     },
-    "env_name": "Reacher-v1",
+    "env_name": "Reacher-v5",
     "baseline_max_timesteps": 5000000,
     "baseline_threshold": 950,
     "baseline_num_envs": 4,

@@ -8,7 +8,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class ReacherConfig_v1(BaseDiffEnv):
+class DiffReacher_v1(BaseDiffEnv):
     """
     ## Parameter Space
 

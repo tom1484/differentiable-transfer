@@ -8,7 +8,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class HalfCheetahConfig_v1(BaseDiffEnv):
+class DiffHalfCheetah_v1(BaseDiffEnv):
     """
     ## Parameter Space
 

@@ -150,7 +150,7 @@ class HalfCheetah_v2(BaseEnv):
         forward_reward_weight: float = 1.0,
         ctrl_cost_weight: float = 0.1,
     ):
-        env = envs.HalfCheetahConfig_v2()
+        env = envs.DiffHalfCheetah_v2()
 
         observation_space = Box(
             low=-np.inf,

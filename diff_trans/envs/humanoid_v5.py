@@ -9,7 +9,7 @@ from mujoco import mjx
 from .base import BaseDiffEnv
 
 
-class DiffAnt_v5(BaseDiffEnv):
+class DiffHumanoid_v5(BaseDiffEnv):
     """
     ## Parameter Space
 

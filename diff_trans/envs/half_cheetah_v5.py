@@ -9,7 +9,7 @@ from .base import BaseDiffEnv
 from .utils.array import sidx
 
 
-class HalfCheetahConfig_v2(BaseDiffEnv):
+class DiffHalfCheetah_v2(BaseDiffEnv):
     """
     ## Parameter Space
 
