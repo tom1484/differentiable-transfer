@@ -56,66 +56,26 @@ class HalfCheetahConfig_v1(BaseDiffEnv):
 
         self.reset_noise_scale = reset_noise_scale
 
+        # fmt: off
         self.parameter_range = jnp.array(
             [
                 [
                     0.2,  # friction
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,  # friction loss
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,  # armature
-                    3.0,
-                    3.0,
-                    1.5,
-                    3.0,
-                    1.5,
-                    1.0,  # damping
-                    4.0,
-                    1.0,
-                    1.0,
-                    0.7,
-                    1.0,
-                    0.8,
-                    0.6,  # mass
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # friction loss
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # armature
+                    3.0, 3.0, 1.5, 3.0, 1.5, 1.0,  # damping
+                    4.0, 1.0, 1.0, 0.7, 1.0, 0.8, 0.6,  # mass
                 ],
                 [
-                    0.6,  # friction
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,  # friction loss
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,
-                    0.3,  # armature
-                    9.0,
-                    6.0,
-                    4.5,
-                    6.0,
-                    4.5,
-                    2.0,  # damping
-                    8.0,
-                    2.0,
-                    2.0,
-                    1.5,
-                    2.0,
-                    1.6,
-                    1.2,  # mass
+                    0.6,  # friction 
+                    0.3, 0.3, 0.3, 0.3, 0.3, 0.3,  # friction loss 
+                    0.3, 0.3, 0.3, 0.3, 0.3, 0.3,  # armature 
+                    9.0, 6.0, 4.5, 6.0, 4.5, 2.0,  # damping 
+                    8.0, 2.0, 2.0, 1.5, 2.0, 1.6, 1.2,  # mass
                 ],
             ]
         )
+        # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
         noise_low = -self.reset_noise_scale

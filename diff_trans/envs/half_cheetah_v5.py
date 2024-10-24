@@ -37,9 +37,24 @@ class HalfCheetahConfig_v2(BaseDiffEnv):
 
         self.reset_noise_scale = reset_noise_scale
 
+        # fmt: off
         self.parameter_range = jnp.array(
-            [[0.2, 0.0, 0.0, 3.0, 3.0, 4.0], [0.6, 0.3, 0.3, 9.0, 6.0, 8.0]]
+            [
+                [
+                    0.2,  # friction
+                    0.0, 0.0,  # armature
+                    3.0, 3.0,  # damping
+                    4.0,  # mass
+                ],
+                [
+                    0.6,  # friction
+                    0.3, 0.3,  # armature
+                    9.0, 6.0,  # damping
+                    8.0,  # mass
+                ],
+            ]
         )
+        # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
         noise_low = -self.reset_noise_scale

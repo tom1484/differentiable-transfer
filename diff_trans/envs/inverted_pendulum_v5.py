@@ -14,14 +14,14 @@ class InvertedPendulumConfig_v1(BaseDiffEnv):
 
     | Num | Parameter                         | Default   | Min | Max  | Joint |
     |-----|-----------------------------------|-----------|-----|------|-------|
-    | 0   | friction loss of the slider       | 0.0       | 0.0 | 0.5  | slide |
-    | 1   | friction loss of the pole rotor   | 0.0       | 0.0 | 0.5  | hinge |
-    | 2   | armature mass of the cart         | 0.0       | 0.0 | 2.0  | slide |
-    | 3   | armature inertia of the pole      | 0.0       | 0.0 | 1.0  | hinge |
-    | 4   | damping of the slider             | 1.0       | 0.5 | 1.5  | slide |
-    | 5   | damping of the pole rotor         | 1.0       | 0.5 | 1.5  | hinge |
+    | 0   | friction loss of the slider       |  0.0      | 0.0 |  0.5 | slide |
+    | 1   | friction loss of the pole rotor   |  0.0      | 0.0 |  0.5 | hinge |
+    | 2   | armature mass of the cart         |  0.0      | 0.0 |  0.5 | slide |
+    | 3   | armature inertia of the pole      |  0.0      | 0.0 |  0.5 | hinge |
+    | 4   | damping of the slider             |  1.0      | 0.5 |  1.5 | slide |
+    | 5   | damping of the pole rotor         |  1.0      | 0.5 |  1.5 | hinge |
     | 6   | mass of the cart                  | 10.471975 | 5.0 | 15.0 |       |
-    | 7   | mass of the joint                 | 5.0185914 | 2.5 | 7.5  |       |
+    | 7   | mass of the joint                 |  5.018591 | 2.5 |  7.5 |       |
     """
 
     def __init__(
@@ -34,12 +34,24 @@ class InvertedPendulumConfig_v1(BaseDiffEnv):
 
         self.reset_noise_scale = reset_noise_scale
 
+        # fmt: off
         self.parameter_range = jnp.array(
             [
-                [0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 5.0, 2.5],
-                [0.5, 0.5, 2.0, 1.0, 1.5, 1.5, 15.0, 7.5],
+                [
+                    0.0, 0.0,  # friction loss
+                    0.5, 0.5,  # armature
+                    0.5, 0.5,  # damping
+                    5.0, 2.5,  # mass
+                ],
+                [
+                    0.5, 0.5,  # friction loss
+                    1.5, 1.5,  # armature
+                    1.5, 1.5,  # damping
+                    15.0, 7.5,  # mass
+                ],
             ]
         )
+        # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
         noise_low = -self.reset_noise_scale

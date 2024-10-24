@@ -14,20 +14,18 @@ class ReacherConfig_v1(BaseDiffEnv):
 
     | Num | Parameter                  | Default   | Min   | Max   | Joint |
     |-----|----------------------------|-----------|-------|-------|-------|
-    | 0   | armature inertia of joint0 | 1.0       | 0.5   | 2.0   | hinge |
-    | 1   | armature inertia of joint1 | 1.0       | 0.5   | 2.0   | hinge |
-    | 2   | damping of joint0          | 1.0       | 0.5   | 2.0   | hinge |
-    | 3   | damping of joint1          | 1.0       | 0.5   | 2.0   | hinge |
-    | 4   | mass of the arm0           | 0.0356047 | 0.018 | 0.072 |       |
-    | 5   | mass of the arm1           | 0.0356047 | 0.018 | 0.072 |       |
-    | 6   | mass of the fingertip      | 0.0041888 | 0.002 | 0.008 |       |
+    | 0   | armature inertia of joint0 | 1.0       | 0.5   | 1.5   | hinge |
+    | 1   | armature inertia of joint1 | 1.0       | 0.5   | 1.5   | hinge |
+    | 2   | damping of joint0          | 1.0       | 0.5   | 1.5   | hinge |
+    | 3   | damping of joint1          | 1.0       | 0.5   | 1.5   | hinge |
+    | 4   | mass of the arm0           | 0.0356047 | 0.018 | 0.056 |       |
+    | 5   | mass of the arm1           | 0.0356047 | 0.018 | 0.056 |       |
+    | 6   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
     """
 
     def __init__(
         self,
         frame_skip: int = 2,
-        reward_dist_weight: float = 1,
-        reward_control_weight: float = 1,
     ):
         observation_dim = 10
         super().__init__(
@@ -36,15 +34,22 @@ class ReacherConfig_v1(BaseDiffEnv):
             observation_dim,
         )
 
-        self.reward_dist_weight = reward_dist_weight
-        self.reward_control_weight = reward_control_weight
-
+        # fmt: off
         self.parameter_range = jnp.array(
             [
-                [0.018, 0.018, 1.0, 1.0, 0.0356047, 0.0356047, 0.0041888],
-                [0.072, 0.072, 2.0, 2.0, 0.072, 0.072, 0.008],
+                [
+                    0.5, 0.5,  # armature
+                    0.5, 0.5,  # damping
+                    0.018, 0.018, 0.002,  # mass
+                ],
+                [
+                    1.5, 1.5,  # armature
+                    1.5, 1.5,  # damping
+                    0.056, 0.056, 0.006,  # mass
+                ],
             ]
         )
+        # fmt: on
 
     def reset(self, key: jnp.array) -> mjx.Data:
         qpos = (
