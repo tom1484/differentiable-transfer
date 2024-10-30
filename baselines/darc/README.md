@@ -63,7 +63,7 @@ pip install tensorflow-probability==0.10.1
 The following lines replicate the DARC experiments:
 
 ```
-python train_eval.py --root_dir=~/darc/broken_reacher --gin_bindings='train_eval.environment_name="broken_reacher"' --gin_bindings='train_eval.delta_r_warmup=1e5' --gin_bindings='critic_loss.delta_r_warmup=1e5'
+python train_eval.py --root_dir=~/darc/broken_reacher --gin_bindings='train_eval.environment_name="broken_reacher"' --gin_bindings='train_eval.delta_r_warmup=100000' --gin_bindings='critic_loss.delta_r_warmup=100000'
 python train_eval.py --root_dir=~/darc/broken_cheetah --gin_bindings='train_eval.environment_name="broken_joint_half_cheetah"'  --gin_bindings='train_eval.delta_r_warmup=1e5' --gin_bindings='critic_loss.delta_r_warmup=1e5'
 python train_eval.py --root_dir=~/darc/broken_ant --gin_bindings='train_eval.environment_name="broken_joint_ant"' --gin_bindings='get_broken_joint_env.broken_joint=3' --gin_bindings='train_eval.delta_r_warmup=1e5' --gin_bindings='critic_loss.delta_r_warmup=1e5'
 python train_eval.py --root_dir=~/darc/cheetah_obstacle --gin_bindings='train_eval.environment_name="half_cheetah_obstacle"' --gin_bindings='get_broken_joint_env.broken_joint=3' --gin_bindings='train_eval.delta_r_warmup=1e5' --gin_bindings='critic_loss.delta_r_warmup=1e5'
