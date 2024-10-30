@@ -1,14 +1,12 @@
-from typing import Tuple
-
-import numpy as np
+from typing import Dict, Tuple, Union
 
 from gymnasium.spaces import Box
 
 from jax import numpy as jnp
+import numpy as np
 
 from .base import BaseEnv
 from ... import envs, sim
-
 
 DEFAULT_CAMERA_CONFIG = {
     "trackbodyid": 0,
@@ -42,7 +40,7 @@ class InvertedPendulum_v5(BaseEnv):
     - *qpos (2 element):* Position values of the robot's cart and pole.
     - *qvel (2 elements):* The velocities of cart and pole (their derivatives).
 
-    The observation space is a `Box(-Inf, Inf, (4,), float32)` where the elements are as follows:
+    The observation space is a `Box(-Inf, Inf, (4,), float64)` where the elements are as follows:
 
     | Num | Observation                                   | Min  | Max | Name (in corresponding XML file) | Joint | Type (Unit)              |
     | --- | --------------------------------------------- | ---- | --- | -------------------------------- | ----- | ------------------------- |
@@ -112,13 +110,27 @@ class InvertedPendulum_v5(BaseEnv):
     * v0: Initial versions release.
     """
 
+    metadata = {
+        "render_modes": [
+            "human",
+            "rgb_array",
+            "depth_array",
+            "rgbd_tuple",
+        ],
+    }
+
     def __init__(
         self,
         num_envs: int = 1,
+        frame_skip: int = 2,
+        default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         max_episode_steps: int = 1000,
         reset_noise_scale: float = 0.02,
+        **kwargs,
     ):
-        diff_env = envs.DiffInvertedPendulum_v5(reset_noise_scale=reset_noise_scale)
+        diff_env = envs.DiffInvertedPendulum_v5(
+            frame_skip=frame_skip, reset_noise_scale=reset_noise_scale
+        )
         self.diff_env = diff_env
 
         self._reset_noise_scale = reset_noise_scale
@@ -130,10 +142,30 @@ class InvertedPendulum_v5(BaseEnv):
             dtype=np.float32,
         )
         action_space = Box(
-            low=diff_env.control_range[0], high=diff_env.control_range[1], dtype=np.float32
+            low=diff_env.control_range[0],
+            high=diff_env.control_range[1],
+            dtype=np.float32,
         )
 
-        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
+        super().__init__(
+            diff_env=diff_env,
+            num_envs=num_envs,
+            max_episode_steps=max_episode_steps,
+            observation_space=observation_space,
+            action_space=action_space,
+            default_camera_config=default_camera_config,
+            **kwargs,
+        )
+
+        self.metadata = {
+            "render_modes": [
+                "human",
+                "rgb_array",
+                "depth_array",
+                "rgbd_tuple",
+            ],
+            "render_fps": int(np.round(1.0 / self.diff_env.dt)),
+        }
 
     def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         data = self._states

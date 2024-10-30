@@ -1,18 +1,19 @@
-from typing import Tuple
-
-import numpy as np
+from typing import Dict, Tuple, Union
 
 from gymnasium.spaces import Box
 
 from jax import numpy as jnp
+import numpy as np
 from mujoco import mjx
 
 from .base import BaseEnv
 from ... import envs, sim
 
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0}
+
 
 class Reacher_v5(BaseEnv):
-    """
+    r"""
     ## Description
     "Reacher" is a two-jointed robot arm.
     The goal is to move the robot's end effector (called *fingertip*) close to a target that is spawned at a random position.
@@ -135,14 +136,26 @@ class Reacher_v5(BaseEnv):
     * v0: Initial versions release
     """
 
+    metadata = {
+        "render_modes": [
+            "human",
+            "rgb_array",
+            "depth_array",
+            "rgbd_tuple",
+        ],
+    }
+
     def __init__(
         self,
         num_envs: int = 1,
-        max_episode_steps: int = 1000,
+        frame_skip: int = 2,
+        default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
+        max_episode_steps: int = 50,
         reward_dist_weight: float = 1,
         reward_control_weight: float = 1,
+        **kwargs,
     ):
-        diff_env = envs.DiffReacher_v5()
+        diff_env = envs.DiffReacher_v5(frame_skip=frame_skip)
         self.diff_env = diff_env
 
         self._reward_dist_weight = reward_dist_weight
@@ -160,7 +173,25 @@ class Reacher_v5(BaseEnv):
             dtype=np.float32,
         )
 
-        super().__init__(num_envs, max_episode_steps, observation_space, action_space)
+        super().__init__(
+            diff_env=diff_env,
+            num_envs=num_envs,
+            max_episode_steps=max_episode_steps,
+            observation_space=observation_space,
+            action_space=action_space,
+            default_camera_config=default_camera_config,
+            **kwargs,
+        )
+
+        self.metadata = {
+            "render_modes": [
+                "human",
+                "rgb_array",
+                "depth_array",
+                "rgbd_tuple",
+            ],
+            "render_fps": int(np.round(1.0 / self.diff_env.dt)),
+        }
 
     def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
         vec = self.diff_env._get_body_com_batch(
@@ -198,6 +229,7 @@ class Reacher_v5(BaseEnv):
             }
         )
 
-        done = jnp.logical_or(jnp.logical_not(is_finite), jnp.abs(qpos[:, 1]) > 0.2)
+        # done = jnp.logical_or(jnp.logical_not(is_finite), jnp.abs(qpos[:, 1]) > 0.2)
+        done = jnp.zeros(self.num_envs, dtype=bool)
 
         return observation, reward, done, info

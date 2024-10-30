@@ -1,12 +1,12 @@
-from pprint import pformat
 import time
-from typing import Any, Dict, Optional, Tuple, List, Type
+from typing import Any, Dict, Optional, Tuple, List, Type, Union
 
 import numpy as np
+import mujoco
 
 import gymnasium as gym
-
 from gymnasium.spaces import Box
+from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
 
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common import env_util
@@ -15,7 +15,7 @@ import jax
 from jax import numpy as jnp
 from mujoco import mjx
 
-from ... import envs
+from ..base import BaseDiffEnv
 
 
 DEFAULT_SIZE = 480
@@ -24,10 +24,17 @@ DEFAULT_SIZE = 480
 class BaseEnv(VecEnv):
     def __init__(
         self,
+        diff_env: BaseDiffEnv,
         num_envs: int,
         max_episode_steps: int,
         observation_space: Box,
         action_space: Box,
+        render_mode: Optional[str] = None,
+        width: int = DEFAULT_SIZE,
+        height: int = DEFAULT_SIZE,
+        camera_id: Optional[int] = None,
+        camera_name: Optional[str] = None,
+        default_camera_config: Optional[Dict[str, Union[float, int]]] = None,
     ) -> None:
         self.num_env = num_envs
         self.num_envs = num_envs
@@ -36,6 +43,28 @@ class BaseEnv(VecEnv):
 
         self.observation_space = observation_space
         self.action_space = action_space
+
+        assert self.metadata["render_modes"] == [
+            "human",
+            "rgb_array",
+            "depth_array",
+            "rgbd_tuple",
+        ], self.metadata["render_modes"]
+        if "render_fps" in self.metadata:
+            assert (
+                int(np.round(1.0 / self.dt)) == self.metadata["render_fps"]
+            ), f'Expected value: {int(np.round(1.0 / diff_env.dt))}, Actual value: {self.metadata["render_fps"]}'
+
+        self._init_rendered(
+            diff_env.mj_model,
+            diff_env.mj_data,
+            render_mode,
+            width,
+            height,
+            camera_id,
+            camera_name,
+            default_camera_config,
+        )
 
     def reset(self):
         obs = self._reset_all()
@@ -139,7 +168,8 @@ class BaseEnv(VecEnv):
         self._actions = jnp.array(actions)
 
     def close(self) -> None:
-        pass
+        if self.mujoco_renderer is not None:
+            self.mujoco_renderer.close()
 
     def _get_indices_len(self, indices) -> int:
         if indices is None:
@@ -182,3 +212,55 @@ class BaseEnv(VecEnv):
             dict([item[0], item[1][e]] for item in info.items())
             for e in range(self.num_envs)
         ]
+
+    def _init_rendered(
+        self,
+        model: "mujoco.MjModel",
+        data: "mujoco.MjData",
+        render_mode: Optional[str],
+        width: int,
+        height: int,
+        camera_id: Optional[int],
+        camera_name: Optional[str],
+        default_camera_config: Optional[Dict[str, Union[float, int]]],
+    ) -> None:
+        # Rendering settings
+        self.width = width
+        self.height = height
+
+        self.render_mode = render_mode
+        self.camera_name = camera_name
+        self.camera_id = camera_id
+
+        model.vis.global_.offwidth = self.width
+        model.vis.global_.offheight = self.height
+        self.mujoco_renderer = MujocoRenderer(
+            model,
+            data,
+            default_cam_config=default_camera_config,
+        )
+
+    def _render_single(self, select_env: int) -> np.ndarray:
+        renderer_model = self.mujoco_renderer.model
+        renderer_data = self.mujoco_renderer.data
+
+        # Update kinematics
+        renderer_data.qpos = np.array(self._states.qpos[select_env])
+        mujoco.mj_forward(renderer_model, renderer_data)
+
+        return self.mujoco_renderer.render(
+            self.render_mode,
+            self.camera_id,
+            self.camera_name,
+        )
+        # return np.random.randint(0, 256, (self.height, self.width, 3))
+
+    def render(self, select_envs: Optional[Union[int, List[int]]] = None) -> np.ndarray:
+        if isinstance(select_envs, int):
+            return self._render_single(select_envs)
+
+        if select_envs is None:
+            select_envs = range(self.num_env)
+
+        frames = [self._render_single(e) for e in select_envs]
+        return np.stack(frames)
