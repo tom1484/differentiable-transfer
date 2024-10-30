@@ -76,7 +76,9 @@ class QValueNet(nn.Module):
         self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.q_value = nn.Linear(hidden_dims[1], 1)
 
-    def forward(self, state_action: torch.Tensor) -> torch.Tensor:
+    def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        state_action = torch.cat([state, action], dim=-1)
+
         x = F.relu(self.fc1(state_action))
         x = F.relu(self.fc2(x))
 

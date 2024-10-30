@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import torch
 from torchrl.objectives import SACLoss
+from torchrl.objectives.utils import SoftUpdate
 from torchrl.modules import ProbabilisticActor, ValueOperator, TanhNormal
 from torchrl.data import Bounded
 from torchrl.envs.utils import RandomPolicy
@@ -47,6 +48,8 @@ class DarcAgent:
         classifier_loss_weight: float = 1.0,
         use_importance_weights: bool = False,
         unnormalized_delta_r: bool = False,
+        target_update_tau: float = 0.01,
+        target_update_period: int = 1,
         **kwargs,
     ):
         self.observation_dim = observation_space.shape[0]
@@ -96,7 +99,12 @@ class DarcAgent:
             **kwargs,
         )
 
+        self.target_updater = SoftUpdate(self.sac_loss, tau=target_update_tau)
+        self.target_update_period = target_update_period
+        self.num_updates = 0
+
         self.random_actor = RandomPolicy(action_spec)
+
 
     @property
     def policy(self):
@@ -106,11 +114,28 @@ class DarcAgent:
     def random_policy(self):
         return self.random_actor
 
-    def collect_experience(self, env: BaseEnv, num_steps: int):
-        raise NotImplementedError
+    def update(self, batch: TensorDict, real_batch: TensorDict):
+        # Update SAC
+        losses = self.sac_loss(batch)
 
-    def train(self, experience, weights, real_experience=None):
-        raise NotImplementedError
+        self.actor_optimizer.zero_grad()
+        losses["loss_actor"].backward()
+        # TODO: Consider grad clipping
+        self.actor_optimizer.step()
+
+        self.q_value_optimizer.zero_grad()
+        losses["loss_qvalue"].backward()
+        # TODO: Consider grad clipping
+        self.q_value_optimizer.step()
+
+        self.value_optimizer.zero_grad()
+        losses["loss_value"].backward()
+        # TODO: Consider grad clipping
+        self.value_optimizer.step()
+
+        self.num_updates += 1
+        if self.num_updates % self.target_update_period == 0:
+            self.target_updater.step()
 
     def _experience_to_sas(self, experience):
         raise NotImplementedError
@@ -138,6 +163,49 @@ class DarcAgent:
         del kwargs
         return
 
+    def save(self, path: str):
+        torch.save(
+            {
+                "actor": self.actor_net.state_dict(),
+                "q_value": self.q_value_net.state_dict(),
+                "value": self.value_net.state_dict(),
+                "classifier": self.classifier_net.state_dict(),
+            },
+            path,
+        )
+
+
+def predict(policy, observations: np.ndarray) -> np.ndarray:
+    observations_dict = TensorDict(
+        {"observation": observations},
+        [
+            observations.shape[0],
+        ],
+    )
+    actions_dict = policy(observations_dict)
+
+    return actions_dict["action"].detach().numpy()
+
+
+def evaluate_policy(env: BaseEnv, policy, num_episodes: int) -> float:
+    ep_returns = []
+    acc_returns = [0.0 for _ in range(env.num_envs)]
+
+    observations = env.reset()
+    while len(ep_returns) < num_episodes:
+        actions = predict(policy, observations)
+        next_observations, rewards, dones, _ = env.step(actions)
+        observations = next_observations
+
+        for i, (reward, done) in enumerate(zip(rewards, dones)):
+            acc_returns[i] += reward
+            if done:
+                ep_returns.append(acc_returns[i])
+                acc_returns[i] = 0
+                i += 1
+
+    return np.mean(ep_returns), np.std(ep_returns)
+
 
 class SimpleCollector:
     """A simple collector that collects experience from an environment."""
@@ -148,17 +216,6 @@ class SimpleCollector:
         self.observations = env.reset()
         self.batch_size = self.observations.shape[0]
 
-    def get_actions(self, policy, observations: np.ndarray) -> np.ndarray:
-        observations_dict = TensorDict(
-            {"observation": torch.tensor(observations)},
-            [
-                self.batch_size,
-            ],
-        )
-        actions_dict = policy(observations_dict)
-
-        return actions_dict["action"].detach().numpy()
-
     def collect(self, policy, num_steps: int) -> TensorDict:
         acc_observations = []
         acc_actions = []
@@ -168,7 +225,7 @@ class SimpleCollector:
 
         observations = self.observations
         for _ in range(num_steps):
-            actions = self.get_actions(policy, self.observations)
+            actions = predict(policy, observations)
             next_observations, rewards, dones, _ = self.env.step(actions)
 
             acc_observations.append(observations)
@@ -183,9 +240,12 @@ class SimpleCollector:
 
         observations = np.concatenate(acc_observations, axis=0)
         actions = np.concatenate(acc_actions, axis=0)
-        dones = np.concatenate(acc_dones, axis=0)
-        rewards = np.concatenate(acc_rewards, axis=0)
+        dones = np.concatenate(acc_dones, axis=0)[:, None]
+        rewards = np.concatenate(acc_rewards, axis=0)[:, None]
         next_observations = np.concatenate(acc_next_observations, axis=0)
+
+        if len(actions.shape) == 1:
+            actions = actions[:, None]
 
         return TensorDict(
             {

@@ -9,7 +9,6 @@ import torch
 import numpy as np
 
 from torchrl.data import TensorDictReplayBuffer, LazyTensorStorage
-from tensordict import TensorDict
 
 from .models import ActorNet, QValueNet, ValueNet, ClassifierNet
 from .agent import DarcAgent, SimpleCollector
@@ -19,31 +18,33 @@ from diff_trans.envs.gym import get_env
 
 def main(
     # root_dir,
+    num_envs: int = 128,
     environment_name: str = "InvertedPendulum-v5",
-    num_iterations=1000000,
-    actor_fc_layers=(256, 256),
-    # critic_obs_fc_layers=None,
-    # critic_action_fc_layers=None,
-    # critic_joint_fc_layers=(256, 256),
-    q_value_fc_layers=(256, 256),
-    value_fc_layers=(256, 256),
+    num_timesteps: int = 1000000,
     initial_collect_steps=10000,
     real_initial_collect_steps=10000,
     collect_steps_per_iteration=1,
     real_collect_interval=10,
+    train_steps_per_iteration=10,
+    batch_size=1024,
+    # critic_obs_fc_layers=None,
+    # critic_action_fc_layers=None,
+    # critic_joint_fc_layers=(256, 256),
+    actor_fc_layers=(256, 256),
+    q_value_fc_layers=(256, 256),
+    value_fc_layers=(256, 256),
     replay_buffer_capacity=1000000,
     # Params for target update
     target_update_tau=0.005,
     target_update_period=1,
     # Params for train
-    train_steps_per_iteration=1,
-    batch_size=256,
     actor_learning_rate=3e-4,
     critic_learning_rate=3e-4,
     classifier_learning_rate=3e-4,
     alpha_learning_rate=3e-4,
     # td_errors_loss_fn=tf.math.squared_difference,
     gamma=0.99,
+    soft_update_interval=1,
     reward_scale_factor=0.1,
     gradient_clipping=None,
     use_tf_functions=True,
@@ -102,10 +103,9 @@ def main(
         q_value_optimizer=None,
         value_optimizer=None,
         classifier_optimizer=None,
-        # target_update_tau=target_update_tau,
-        # target_update_period=target_update_period,
+        target_update_tau=target_update_tau,
+        target_update_period=target_update_period,
         # td_errors_loss_fn=td_errors_loss_fn,
-        # gamma=gamma,
         # reward_scale_factor=reward_scale_factor,
         # gradient_clipping=gradient_clipping,
         # train_step_counter=global_step,
@@ -114,9 +114,11 @@ def main(
     # Make the replay buffer.
     replay_buffer = TensorDictReplayBuffer(
         storage=LazyTensorStorage(max_size=replay_buffer_capacity),
+        batch_size=batch_size,
     )
     real_replay_buffer = TensorDictReplayBuffer(
         storage=LazyTensorStorage(max_size=replay_buffer_capacity),
+        batch_size=batch_size,
     )
 
     # Create policyies
@@ -135,43 +137,16 @@ def main(
         real_collector.collect(init_collect_policy, real_initial_collect_steps)
     )
 
+    dataset = iter(replay_buffer)
+    real_dataset = iter(real_replay_buffer)
+
     time_step = None
     real_time_step = None
-    # policy_state = collect_policy.get_initial_state(tf_env.batch_size)
 
-    # timed_at_step = global_step.numpy()
-    # time_acc = 0
-
-    # # Prepare replay buffer as dataset with invalid transitions filtered.
-    # def _filter_invalid_transition(trajectories, unused_arg1):
-    #     return ~trajectories.is_boundary()[0]
-
-    # dataset = (
-    #     replay_buffer.as_dataset(sample_batch_size=batch_size, num_steps=2)
-    #     .unbatch()
-    #     .filter(_filter_invalid_transition)
-    #     .batch(batch_size)
-    #     .prefetch(5)
-    # )
-    # real_dataset = (
-    #     real_replay_buffer.as_dataset(sample_batch_size=batch_size, num_steps=2)
-    #     .unbatch()
-    #     .filter(_filter_invalid_transition)
-    #     .batch(batch_size)
-    #     .prefetch(5)
-    # )
-
-    # # Dataset generates trajectories with shape [Bx2x...]
-    # iterator = iter(dataset)
-    # real_iterator = iter(real_dataset)
-
-    # def train_step():
-    #     experience, _ = next(iterator)
-    #     real_experience, _ = next(real_iterator)
-    #     return tf_agent.train(experience, real_experience=real_experience)
-
-    # if use_tf_functions:
-    #     train_step = common.function(train_step)
+    def train_step():
+        batch = next(dataset)
+        real_batch, _ = next(real_dataset)
+        return darc_agent.update(batch, real_batch)
 
     # for _ in range(num_iterations):
     #     start_time = time.time()
