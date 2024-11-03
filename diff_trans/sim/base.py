@@ -48,6 +48,8 @@ def step(
 
 step_at_v = jax.vmap(step_at, in_axes=(None, None, None, 0, 0))
 step_v = jax.vmap(step, in_axes=(None, None, 0, 0))
+forward_v = jax.vmap(forward, in_axes=(0, 0, None))
 
-step_at_vj = jax.jit(jax.vmap(step_at, in_axes=(None, None, None, 0, 0)), static_argnums=0)
-step_vj = jax.jit(jax.vmap(step, in_axes=(None, None, 0, 0)), static_argnums=0)
+step_at_vj = jax.jit(step_at_v, static_argnums=0)
+step_vj = jax.jit(step_v, static_argnums=0)
+forward_vj = jax.jit(forward_v)

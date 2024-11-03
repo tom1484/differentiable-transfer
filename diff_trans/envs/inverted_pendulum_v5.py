@@ -65,6 +65,7 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
         qvel = self.init_qvel + noise[2:]
 
         return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
+        # return self.data.replace(qpos=qpos, qvel=qvel)
 
     def get_parameter(self) -> jnp.ndarray:
         frictionloss = self.model.dof_frictionloss.copy()

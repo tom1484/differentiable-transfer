@@ -36,6 +36,9 @@ class BaseEnv(VecEnv):
         camera_name: Optional[str] = None,
         default_camera_config: Optional[Dict[str, Union[float, int]]] = None,
     ) -> None:
+        """
+        Initialize the environment.
+        """
         self.num_env = num_envs
         self.num_envs = num_envs
 
@@ -55,7 +58,7 @@ class BaseEnv(VecEnv):
                 int(np.round(1.0 / self.dt)) == self.metadata["render_fps"]
             ), f'Expected value: {int(np.round(1.0 / diff_env.dt))}, Actual value: {self.metadata["render_fps"]}'
 
-        self._init_rendered(
+        self._init_renderer(
             diff_env.mj_model,
             diff_env.mj_data,
             render_mode,
@@ -66,7 +69,13 @@ class BaseEnv(VecEnv):
             default_camera_config,
         )
 
+        # Compile the JIT functions for the environment for faster runtime
+        diff_env.compile(num_envs)
+
     def reset(self):
+        """
+        Reset the environment.
+        """
         obs = self._reset_all()
 
         self.steps = np.zeros(self.num_env, dtype=int)
@@ -76,6 +85,9 @@ class BaseEnv(VecEnv):
         return obs
 
     def _reset_all(self) -> np.ndarray:
+        """
+        Reset the underlying differentiable environment.
+        """
         rng = jax.random.PRNGKey(time.time_ns())
         rng = jax.random.split(rng, self.num_envs)
 
@@ -85,17 +97,18 @@ class BaseEnv(VecEnv):
         return np.asarray(obs).copy()
 
     def _reset_at(self, at: np.ndarray) -> np.ndarray:
-        n = at.astype(np.int32).sum()
-
+        """
+        Reset the underlying differentiable environment at the given indices.
+        """
         rng = jax.random.PRNGKey(time.time_ns())
-        rng = jax.random.split(rng, n)
+        rng = jax.random.split(rng, self.num_envs)
 
         data = self._states
         new_data = self.diff_env.reset_vj(rng)
-        obs = self.diff_env._get_obs_vj(new_data)
+        obs = self.diff_env._get_obs_vj(new_data)[at]
 
-        new_qpos = data.qpos.at[at].set(new_data.qpos)
-        new_qvel = data.qvel.at[at].set(new_data.qvel)
+        new_qpos = data.qpos.at[at].set(new_data.qpos[at])
+        new_qvel = data.qvel.at[at].set(new_data.qvel[at])
 
         data = data.replace(qpos=new_qpos, qvel=new_qvel)
         self._states = data
@@ -109,6 +122,9 @@ class BaseEnv(VecEnv):
         done: np.ndarray,
         info: Optional[Dict] = None,
     ) -> Tuple[np.ndarray, List[Dict[str, Any]]]:
+        """
+        Determine if the episode is done and update the steps and rewards.
+        """
         if self.steps.max() >= self.rewards.shape[1]:
             self.rewards = np.hstack([self.rewards, self.rewards])
 
@@ -153,6 +169,9 @@ class BaseEnv(VecEnv):
         NotImplementedError()
 
     def step_wait(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[Dict]]:
+        """
+        Step the environment.
+        """
         observation, reward, done, info = self._step_wait()
         observation = np.asarray(observation).copy()
         reward = np.asarray(reward).copy()
@@ -213,7 +232,7 @@ class BaseEnv(VecEnv):
             for e in range(self.num_envs)
         ]
 
-    def _init_rendered(
+    def _init_renderer(
         self,
         model: "mujoco.MjModel",
         data: "mujoco.MjData",
@@ -224,6 +243,9 @@ class BaseEnv(VecEnv):
         camera_name: Optional[str],
         default_camera_config: Optional[Dict[str, Union[float, int]]],
     ) -> None:
+        """
+        Initialize the renderer.
+        """
         # Rendering settings
         self.width = width
         self.height = height
@@ -241,6 +263,9 @@ class BaseEnv(VecEnv):
         )
 
     def _render_single(self, select_env: int) -> np.ndarray:
+        """
+        Render a single environment.
+        """
         renderer_model = self.mujoco_renderer.model
         renderer_data = self.mujoco_renderer.data
 
@@ -256,6 +281,9 @@ class BaseEnv(VecEnv):
         # return np.random.randint(0, 256, (self.height, self.width, 3))
 
     def render(self, select_envs: Optional[Union[int, List[int]]] = None) -> np.ndarray:
+        """
+        Render the environment for the given indices.
+        """
         if isinstance(select_envs, int):
             return self._render_single(select_envs)
 
