@@ -1,13 +1,15 @@
+from typing import cast
+
 from os import path
 
 import jax
 from jax import numpy as jnp
+import jax.core
+import jax.lib
 import numpy as np
 
 import mujoco
 from mujoco import mjx
-
-from ..sim import step_vj, step_at_vj
 
 
 class BaseDiffEnv:
@@ -57,18 +59,19 @@ class BaseDiffEnv:
         self.dt = frame_skip * mj_model.opt.timestep
 
         # Initialize the JIT functions
-        self.reset_vj = jax.jit(jax.vmap(self.reset))
+        self.reset_vj = cast(jax.stages.Compiled, jax.jit(jax.vmap(self.reset)))
 
-        self._state_to_data_vj = jax.jit(
-            jax.vmap(self._state_to_data, in_axes=(None, 0))
+        self._state_to_data_vj = cast(
+            jax.stages.Compiled,
+            jax.jit(jax.vmap(self._state_to_data, in_axes=(None, 0))),
         )
-        self._control_to_data_vj = jax.jit(
-            jax.vmap(self._control_to_data, in_axes=(None, 0))
+        self._control_to_data_vj = cast(
+            jax.stages.Compiled,
+            jax.jit(jax.vmap(self._control_to_data, in_axes=(None, 0))),
         )
-        self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
+        self._get_obs_vj = cast(jax.stages.Compiled, jax.jit(jax.vmap(self._get_obs)))
 
-        self.step_vj = step_vj
-        self.step_at_vj = step_at_vj
+        self.step_vj = cast(jax.stages.Compiled, None)
 
         # Set default values
         self._reset_noise_scale = 0
@@ -78,6 +81,9 @@ class BaseDiffEnv:
         """
         Compile the JIT functions for the environment for the given number of environments.
         """
+        # Prevent circular import
+        from ..sim import step_vj
+
         rng = jax.random.PRNGKey(0)
         rng = jax.random.split(rng, num_envs)
         self.reset_vj = self.reset_vj.lower(rng).compile()
