@@ -1,11 +1,12 @@
 import numpy as np
 
 from jax import numpy as jnp
-from jax import random, lax
+from jax import random
 
 from mujoco import mjx
 
 from .base import BaseDiffEnv
+from .utils.array import sidx
 
 
 class DiffReacher_v5(BaseDiffEnv):
@@ -104,7 +105,8 @@ class DiffReacher_v5(BaseDiffEnv):
         )
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
-        cos = states[0:2]
+        # TODO: Use parallelized version
+        cos = states[:2]
         sin = states[2:4]
         theta = jnp.arctan2(sin, cos)
 

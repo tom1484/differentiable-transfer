@@ -59,19 +59,17 @@ class BaseDiffEnv:
         self.dt = frame_skip * mj_model.opt.timestep
 
         # Initialize the JIT functions
-        self.reset_vj = cast(jax.stages.Compiled, jax.jit(jax.vmap(self.reset)))
+        self.reset_vj = jax.jit(jax.vmap(self.reset))
 
-        self._state_to_data_vj = cast(
-            jax.stages.Compiled,
-            jax.jit(jax.vmap(self._state_to_data, in_axes=(None, 0))),
+        self._control_to_data_vj = jax.jit(
+            jax.vmap(self._control_to_data, in_axes=(None, 0))
         )
-        self._control_to_data_vj = cast(
-            jax.stages.Compiled,
-            jax.jit(jax.vmap(self._control_to_data, in_axes=(None, 0))),
-        )
-        self._get_obs_vj = cast(jax.stages.Compiled, jax.jit(jax.vmap(self._get_obs)))
+        self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
-        self.step_vj = cast(jax.stages.Compiled, None)
+        # Prevent circular import
+        from ..sim import step_vj
+
+        self.step_vj = step_vj
 
         # Set default values
         self._reset_noise_scale = 0
@@ -81,22 +79,20 @@ class BaseDiffEnv:
         """
         Compile the JIT functions for the environment for the given number of environments.
         """
-        # Prevent circular import
-        from ..sim import step_vj
-
         rng = jax.random.PRNGKey(0)
         rng = jax.random.split(rng, num_envs)
         self.reset_vj = self.reset_vj.lower(rng).compile()
 
         data = self.reset_vj(rng)
-        state = jnp.zeros((num_envs, self.state_dim))
-        control = jnp.zeros((num_envs, self.control_dim))
+        self._get_obs_vj = self._get_obs_vj.lower(data).compile()
 
-        self._state_to_data_vj = self._state_to_data_vj.lower(data, state).compile()
+        control = jnp.zeros((num_envs, self.control_dim))
         self._control_to_data_vj = self._control_to_data_vj.lower(
             data, control
         ).compile()
-        self._get_obs_vj = self._get_obs_vj.lower(data).compile()
+
+        # Prevent circular import
+        from ..sim import step_vj
 
         self.step_vj = step_vj.lower(self, self.model, data, control).compile()
 

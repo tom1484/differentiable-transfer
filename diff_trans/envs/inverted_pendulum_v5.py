@@ -103,6 +103,7 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
         )
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+        # TODO: Use parallelized version
         qpos = states[:2]
         qvel = states[2:]
         return data.replace(qpos=qpos, qvel=qvel)

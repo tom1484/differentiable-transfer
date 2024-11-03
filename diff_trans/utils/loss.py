@@ -32,8 +32,7 @@ def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectorie
 
     model = env.set_parameter(parameter)
     data = env.data
-    # _, next_observations_sim = sim.step_at_v(env, model, data, observations, actions)
-    # WARNING: Temporary disable for JAX issue
+    # TODO: Do not use step_at_vj
     _, next_observations_sim = sim.step_at_vj(env, model, data, observations, actions)
 
     diff = next_observations - next_observations_sim
