@@ -26,8 +26,8 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
 
     def __init__(
         self,
-        frame_skip: int = 2,
-        reset_noise_scale: float = 0.02,
+        frame_skip: int,
+        reset_noise_scale: float,
     ):
         observation_dim = 4
         super().__init__("inverted_pendulum.xml", frame_skip, observation_dim)
@@ -58,14 +58,16 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
         noise_high = self._reset_noise_scale
 
         noise = random.uniform(
-            key, shape=(2 * self.model.nq,), minval=noise_low, maxval=noise_high
+            key,
+            shape=(self.model.nq + self.model.nv,),
+            minval=noise_low,
+            maxval=noise_high,
         )
 
         qpos = self.init_qpos + noise[:2]
         qvel = self.init_qvel + noise[2:]
 
-        return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
-        # return self.data.replace(qpos=qpos, qvel=qvel)
+        return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
         frictionloss = self.model.dof_frictionloss.copy()

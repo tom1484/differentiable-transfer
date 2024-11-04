@@ -35,6 +35,7 @@ class BaseEnv(VecEnv):
         camera_id: Optional[int] = None,
         camera_name: Optional[str] = None,
         default_camera_config: Optional[Dict[str, Union[float, int]]] = None,
+        precompile: bool = True,
     ) -> None:
         """
         Initialize the environment.
@@ -70,7 +71,8 @@ class BaseEnv(VecEnv):
         )
 
         # Compile the JIT functions for the environment for faster runtime
-        diff_env.compile(num_envs)
+        if precompile:
+            diff_env.compile(num_envs)
 
     def reset(self):
         """

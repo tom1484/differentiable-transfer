@@ -70,10 +70,7 @@ class EvalCallback(EventCallback):
         callback_on_log: Optional[Callable[[Dict[str, Any]], None]] = None,
         n_eval_episodes: int = 5,
         eval_freq: int = 10000,
-        # log_path: Optional[str] = None,
-        # best_model_save_path: Optional[str] = None,
-        # deterministic: bool = True,
-        # render: bool = False,
+        reward_threshold: float = -np.inf,
         verbose: int = 1,
         warn: bool = True,
     ):
@@ -89,20 +86,11 @@ class EvalCallback(EventCallback):
         self.eval_freq = eval_freq
         self.best_mean_reward = -np.inf
         self.last_mean_reward = -np.inf
-        # self.deterministic = deterministic
-        # self.render = render
         self.warn = warn
 
-        # Convert to VecEnv for consistency
-        # if not isinstance(eval_env, VecEnv):
-        #     eval_env = DummyVecEnv([lambda: eval_env])  # type: ignore[list-item, return-value]
+        self.reward_threshold = reward_threshold
 
         self.eval_env = eval_env
-        # self.best_model_save_path = best_model_save_path
-        # Logs will be written in ``evaluations.npz``
-        # if log_path is not None:
-        #     log_path = os.path.join(log_path, "evaluations")
-        # self.log_path = log_path
         self.evaluations_results: List[List[float]] = []
         self.evaluations_timesteps: List[int] = []
         self.evaluations_length: List[List[int]] = []
@@ -118,49 +106,14 @@ class EvalCallback(EventCallback):
                 f"{self.training_env} != {self.eval_env}"
             )
 
-        # Create folders if needed
-        # if self.best_model_save_path is not None:
-        #     os.makedirs(self.best_model_save_path, exist_ok=True)
-        # if self.log_path is not None:
-        #     os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
-
         # Init callback called on new best model
         if self.callback_on_new_best is not None:
             self.callback_on_new_best.init_callback(self.model)
-
-    # def _log_success_callback(
-    #     self, locals_: Dict[str, Any], globals_: Dict[str, Any]
-    # ) -> None:
-    #     """
-    #     Callback passed to the  ``evaluate_policy`` function
-    #     in order to log the success rate (when applicable),
-    #     for instance when using HER.
-
-    #     :param locals_:
-    #     :param globals_:
-    #     """
-    #     info = locals_["info"]
-
-    #     if locals_["done"]:
-    #         maybe_is_success = info.get("is_success")
-    #         if maybe_is_success is not None:
-    #             self._is_success_buffer.append(maybe_is_success)
 
     def _on_step(self) -> bool:
         continue_training = True
 
         if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
-            # Sync training and eval env if there is VecNormalize
-            # if self.model.get_vec_normalize_env() is not None:
-            #     try:
-            #         sync_envs_normalization(self.training_env, self.eval_env)
-            #     except AttributeError as e:
-            #         raise AssertionError(
-            #             "Training and eval env are not wrapped the same way, "
-            #             "see https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#evalcallback "
-            #             "and warning above."
-            #         ) from e
-
             # Reset success rate buffer
             self._is_success_buffer = []
 
@@ -169,11 +122,7 @@ class EvalCallback(EventCallback):
                 self.eval_env,
                 self.model,
                 n_eval_episodes=self.n_eval_episodes,
-                # render=self.render,
-                # deterministic=self.deterministic,
                 return_episode_rewards=True,
-                # warn=self.warn,
-                # callback=self._log_success_callback,
             )
 
             mean_return, std_return = np.mean(episode_rewards), np.std(episode_rewards)
@@ -200,31 +149,11 @@ class EvalCallback(EventCallback):
             if self.callback_on_log is not None:
                 self.callback_on_log(metrics)
 
-            # Add to current Logger
-            # self.logger.record("eval/mean_reward", float(mean_reward))
-            # self.logger.record("eval/mean_ep_length", mean_ep_length)
-
-            # if len(self._is_success_buffer) > 0:
-            #     success_rate = np.mean(self._is_success_buffer)
-            #     if self.verbose >= 1:
-            #         print(f"Success rate: {100 * success_rate:.2f}%")
-            #     self.logger.record("eval/success_rate", success_rate)
-
-            # Dump log so the evaluation results are printed with the correct timestep
-            # self.logger.record(
-            #     "time/total_timesteps", self.num_timesteps, exclude="tensorboard"
-            # )
-            # self.logger.dump(self.num_timesteps)
-
             if mean_return > self.best_mean_reward:
                 if self.verbose >= 1:
                     print("New best mean reward!")
-                # if self.best_model_save_path is not None:
-                #     self.model.save(
-                #         os.path.join(self.best_model_save_path, "best_model")
-                #     )
                 self.best_mean_reward = float(mean_return)
-                # Trigger callback on new best model, if needed
+                
                 if self.callback_on_new_best is not None:
                     continue_training = self.callback_on_new_best.on_step()
 

@@ -125,7 +125,7 @@ class InvertedPendulum_v5(BaseEnv):
         frame_skip: int = 2,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         max_episode_steps: int = 1000,
-        reset_noise_scale: float = 0.02,
+        reset_noise_scale: float = 0.01,
         **kwargs,
     ):
         diff_env = envs.DiffInvertedPendulum_v5(

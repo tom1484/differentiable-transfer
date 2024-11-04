@@ -24,7 +24,7 @@ class DiffReacher_v5(BaseDiffEnv):
     | 6   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
     """
 
-    def __init__(self, frame_skip: int = 2):
+    def __init__(self, frame_skip):
         observation_dim = 10
         super().__init__(
             "reacher.xml",
@@ -73,7 +73,7 @@ class DiffReacher_v5(BaseDiffEnv):
         )
         qvel = qvel.at[-2:].set(0)
 
-        return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
+        return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
         armature = self.model.dof_armature.copy()

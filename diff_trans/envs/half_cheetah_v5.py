@@ -25,8 +25,8 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
 
     def __init__(
         self,
-        frame_skip: int = 2,
-        reset_noise_scale: float = 0.1,
+        frame_skip: int,
+        reset_noise_scale: float,
     ):
         observation_dim = 18
         super().__init__(
@@ -68,7 +68,7 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         qpos = self.init_qpos + pos_noise
         qvel = self.init_qvel + vel_noise
 
-        return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
+        return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def get_parameter(self) -> jnp.ndarray:
         friction = self.model.geom_friction.copy()
