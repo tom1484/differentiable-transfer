@@ -18,7 +18,7 @@ def flag_str(v: Any, type: FlagType) -> str:
     elif type == FlagType.SWITCH:
         return "on" if v else "off"
     elif type == FlagType.LIST:
-        return ",".join(v)
+        return ",".join([str(i) for i in v])
 
 
 def set_env_vars(

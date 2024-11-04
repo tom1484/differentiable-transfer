@@ -26,7 +26,6 @@ class CONFIG:
     param_values: Union[None, float, List[float]] = None
     param_deviations: Union[float, List[float]] = 0.3
 
-    adapt_train_lr: float = 1e-2
     adapt_max_timesteps: int = 1000000
     adapt_threshold: int = 100
     adapt_num_envs: int = 256
@@ -69,15 +68,17 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
         EvalCallback,
     )
 
-    from utils.exp import convert_arg_array
+    from experiments.utils.exp import convert_arg_array
     from constants import ALGORITHMS
 
     Algorithm = ALGORITHMS[config.algorithm]
 
     # Initialize environments and parameters
+    print(f"Initializing environment {config.env_name}")
     Env = get_env(config.env_name)
     sim_env = Env(num_envs=config.baseline_num_envs)
     preal_env = Env(num_envs=config.adapt_num_envs)
+    print(f"Environment initialized")
 
     sim_env_conf = sim_env.diff_env
     preal_env_conf = preal_env.diff_env
@@ -86,7 +87,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     default_parameter = preal_env_conf.get_parameter()
     num_parameters = default_parameter.shape[0]
     parameter_range = preal_env_conf.parameter_range
-    parameter_min, parameter_max = parameter_range
+    _, parameter_max = parameter_range
 
     # Determine parameters to adapt and their values
     if config.adapt_params is None:
@@ -121,7 +122,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
     # Train baseline model
     model_name = f"{config.algorithm}-{config.env_name}-baseline"
-    model = Algorithm("MlpPolicy", sim_env, verbose=0, **config.algorithm_config)
+    model = Algorithm("MlpPolicy", sim_env, verbose=1, **config.algorithm_config)
     model_path = os.path.join(models_dir, f"{model_name}.zip")
 
     if os.path.exists(model_path) and not config.override:
@@ -200,7 +201,6 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
                         "env_name": config.env_name,
                         "baseline_mean_return": baseline_eval[0],
                         "param_deviations": config.param_deviations,
-                        "adapt_train_lr": config.adapt_train_lr,
                         "adapt_threshold": config.adapt_threshold,
                         "adapt_num_envs": config.adapt_num_envs,
                         "eval_frequency": config.eval_frequency,
@@ -230,7 +230,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
             # Load baseline model and adapt to new environment
             model = Algorithm(
-                "MlpPolicy", preal_env, verbose=0, **config.algorithm_config
+                "MlpPolicy", preal_env, verbose=1, **config.algorithm_config
             )
             model = model.load(model_path, preal_env)
 

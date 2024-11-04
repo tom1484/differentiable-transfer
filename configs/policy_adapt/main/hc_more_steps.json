@@ -1,0 +1,22 @@
+{
+    "cuda_visible_devices": [0],
+    "exp_start": 0,
+    "num_exp": 6,
+    "algorithm": "SAC",
+    "algorithm_config": {},
+    "env_name": "HalfCheetah-v5",
+    "baseline_max_timesteps": 5000000,
+    "baseline_threshold": 2000,
+    "baseline_num_envs": 32,
+    "adapt_params": 5,
+    "param_values": 4.0,
+    "param_deviations": 0.0,
+    "adapt_max_timesteps": 5000000,
+    "adapt_threshold": 2000,
+    "adapt_num_envs": 32,
+    "eval_num_episodes": 256,
+    "eval_frequency": 25600,
+    "log_wandb": true,
+    "override": false,
+    "debug_nans": false
+}

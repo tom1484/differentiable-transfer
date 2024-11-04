@@ -1,12 +1,12 @@
 {
-    "cuda_visible_devices": null,
+    "cuda_visible_devices": [0],
     "algorithm": "SAC",
     "algorithm_config": {},
     "env_name": "InvertedPendulum-v5",
-    "num_envs": 256,
-    "timesteps": 1000000,
+    "num_envs": 16,
+    "timesteps": 100000,
     "eval_num_episodes": 1024,
-    "eval_frequency": 50000,
+    "eval_frequency": 10000,
     "log_wandb": false,
     "debug_nans": false
 }
