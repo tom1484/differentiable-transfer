@@ -1,0 +1,1 @@
+export LD_LIBRARY_PATH=/home/tomchen/.mujoco/mujoco321/bin:/home/tomchen/.local/applications/graphviz/lib:/home/tomchen/.local/applications/clang/lib:/home/tomchen/.mujoco/mujoco321/bin:/home/tomchen/.local/applications/graphviz/lib:/home/tomchen/.local/applications/clang/lib:/home/tomchen/.mujoco/mujoco200/bin

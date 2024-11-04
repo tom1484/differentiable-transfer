@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torchrl.modules.distributions import NormalParamExtractor
 
 
 class ClassifierNet(nn.Module):
@@ -32,8 +32,11 @@ class ClassifierNet(nn.Module):
         self.sas_dim = 2 * self.s_dim + self.a_dim
         self.sa_dim = self.sas_dim - self.s_dim
 
-    def forward(self, sas_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        sa_input = sas_input[:, : -self.s_dim]
+    def forward(
+        self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        sa_input = torch.cat([state, action], dim=-1)
+        sas_input = torch.cat([state, action, next_state], dim=-1)
 
         if self.input_noise > 0:
             sa_input = sa_input + torch.randn_like(sa_input) * self.input_noise
@@ -48,53 +51,72 @@ class ClassifierNet(nn.Module):
         return sa_probs, sas_probs
 
 
+# class ActorNet(nn.Module):
+#     def __init__(self, observation_dim: int, action_dim: int, hidden_dims: List[int]):
+#         super().__init__()
+
+#         self.layers = nn.Sequential(
+#             nn.Linear(observation_dim, hidden_dims[0]),
+#             nn.Tanh(),
+#             nn.Linear(hidden_dims[0], hidden_dims[1]),
+#             nn.Tanh(),
+#             nn.Linear(hidden_dims[1], action_dim * 2),
+#         )
+#         self.param_extractor = NormalParamExtractor()
+
+#     def forward(self, state: torch.Tensor) -> torch.Tensor:
+#         return self.param_extractor(self.layers(state))
+
+
 class ActorNet(nn.Module):
     def __init__(self, observation_dim: int, action_dim: int, hidden_dims: List[int]):
         super().__init__()
 
-        self.fc1 = nn.Linear(observation_dim, hidden_dims[0])
-        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-
-        self.mean = nn.Linear(hidden_dims[1], action_dim)
-        self.log_std = nn.Linear(hidden_dims[1], action_dim)
+        self.layers = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dims[0]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[0], hidden_dims[1]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[1], action_dim * 2),
+        )
+        self.normal_extractor = NormalParamExtractor()
 
     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
+        mu, log_std = self.normal_extractor(self.layers(state))
+        std = log_std.exp()
 
-        mean = self.mean(x)
-        log_std = torch.clamp(self.log_std(x), -20, 2)
-
-        return mean, log_std
+        return mu, std
 
 
 class QValueNet(nn.Module):
     def __init__(self, observation_dim: int, action_dim: int, hidden_dims: List[int]):
         super().__init__()
 
-        self.fc1 = nn.Linear(observation_dim + action_dim, hidden_dims[0])
-        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.q_value = nn.Linear(hidden_dims[1], 1)
+        self.layers = nn.Sequential(
+            nn.Linear(observation_dim + action_dim, hidden_dims[0]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[0], hidden_dims[1]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[1], 1),
+        )
 
     def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         state_action = torch.cat([state, action], dim=-1)
 
-        x = F.relu(self.fc1(state_action))
-        x = F.relu(self.fc2(x))
-
-        return self.q_value(x)
+        return self.layers(state_action)
 
 
 class ValueNet(nn.Module):
     def __init__(self, observation_dim: int, hidden_dims: List[int]):
         super().__init__()
 
-        self.fc1 = nn.Linear(observation_dim, hidden_dims[0])
-        self.fc2 = nn.Linear(hidden_dims[0], hidden_dims[1])
-        self.value = nn.Linear(hidden_dims[1], 1)
+        self.layers = nn.Sequential(
+            nn.Linear(observation_dim, hidden_dims[0]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[0], hidden_dims[1]),
+            nn.ReLU(),
+            nn.Linear(hidden_dims[1], 1),
+        )
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
-
-        return self.value(x)
+        return self.layers(state)

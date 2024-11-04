@@ -1,10 +1,12 @@
-from typing import List, Optional
+import collections
+from typing import List, Optional, Any, Callable
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 
+import time
 from tqdm import tqdm
 
 from torchrl.objectives import SACLoss
@@ -21,6 +23,18 @@ from gymnasium.spaces import Box
 from diff_trans.envs.gym import BaseEnv
 
 from .models import ActorNet, QValueNet, ValueNet, ClassifierNet
+
+
+DarcLossInfo = collections.namedtuple(
+    "DarcLossInfo",
+    (
+        "critic_loss",
+        "actor_loss",
+        "alpha_loss",
+        "sa_classifier_loss",
+        "sas_classifier_loss",
+    ),
+)
 
 
 def check_grad_magnitude(params: List[torch.nn.Parameter]):
@@ -44,12 +58,20 @@ class DarcAgent:
         self,
         observation_space: Box,
         action_space: Box,
+        # SAC networks
         actor_net: ActorNet,
         q_value_net: QValueNet,
         value_net: ValueNet,
+        # Classifier network
         classifier_net: ClassifierNet,
-        classifier_optimizer: torch.optim.Optimizer,
-        learning_rate: float,
+        # LR
+        learning_rate: float, 
+        # SAC network optimizers
+        make_actor_optimizer: Callable[[Any], torch.optim.Optimizer],
+        make_q_value_optimizer: Callable[[Any], torch.optim.Optimizer],
+        make_value_optimizer: Callable[[Any], torch.optim.Optimizer],
+        # Classifier optimizer
+        make_classifier_optimizer: Callable[[Any], torch.optim.Optimizer],
         classifier_loss_weight: float = 1.0,
         use_importance_weights: bool = False,
         unnormalized_delta_r: bool = False,
@@ -67,7 +89,9 @@ class DarcAgent:
         self.unnormalized_delta_r = unnormalized_delta_r
 
         self.classifier_net = classifier_net.cuda()
-        self.classifier_optimizer = classifier_optimizer
+        # self.classifier_optimizer = make_classifier_optimizer(
+        #     classifier_net.parameters()
+        # )
 
         self.classifier = TensorDictModule(
             self.classifier_net,
@@ -112,6 +136,20 @@ class DarcAgent:
             **kwargs,
         ).cuda()
 
+        # self.actor_params = []
+        # self.q_value_params = []
+        # self.value_params = []
+        # for name, param in self.sac_loss.named_parameters():
+        #     if "actor_network_params" in name:
+        #         self.actor_params.append(param)
+        #     elif "qvalue_network_params" in name:
+        #         self.q_value_params.append(param)
+        #     elif "value_network_params" in name:
+        #         self.value_params.append(param)
+
+        # self.actor_optimizer = make_actor_optimizer(self.actor_params)
+        # self.q_value_optimizer = make_q_value_optimizer(self.q_value_params)
+        # self.value_optimizer = make_value_optimizer(self.value_params)
         self.optimizer = Adam(self.sac_loss.parameters(), lr=learning_rate)
 
         self.target_updater = SoftUpdate(self.sac_loss, tau=target_update_tau)
@@ -120,7 +158,7 @@ class DarcAgent:
 
     @property
     def policy(self):
-        return self.sac_loss.actor_network
+        return self.actor
 
     def get_init_policy(self, batch_size: int):
         return RandomPolicy(
@@ -151,6 +189,24 @@ class DarcAgent:
         # Update SAC
         losses = self.sac_loss(batch)
 
+        # self.actor_optimizer.zero_grad()
+        # losses["loss_actor"].backward()
+        # # check_grad_magnitude(self.actor_params)
+        # # TODO: Consider grad clipping
+        # self.actor_optimizer.step()
+
+        # self.q_value_optimizer.zero_grad()
+        # losses["loss_qvalue"].backward()
+        # # check_grad_magnitude(self.q_value_params)
+        # # TODO: Consider grad clipping
+        # self.q_value_optimizer.step()
+
+        # self.value_optimizer.zero_grad()
+        # losses["loss_value"].backward()
+        # # check_grad_magnitude(self.value_params)
+        # # TODO: Consider grad clipping
+        # self.value_optimizer.step()
+
         loss = (
             losses["loss_actor"]
             + losses["loss_qvalue"]
@@ -161,6 +217,13 @@ class DarcAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        # for name, param in self.sac_loss.named_parameters():
+        #     print(name)
+        #     if param.grad is not None:
+        #         print("  ", param.grad.norm().item())
+        #     else:
+        #         print("  None")
 
         self.num_updates += 1
         if self.num_updates % self.target_update_period == 0:
@@ -245,18 +308,17 @@ def evaluate_policy(env: BaseEnv, policy, num_episodes: int) -> float:
     acc_returns = [0.0 for _ in range(env.num_envs)]
 
     observations = env.reset()
-    with tqdm(total=num_episodes) as pbar:
-        while len(ep_returns) < num_episodes:
-            actions = predict(policy, observations)
-            next_observations, rewards, dones, _ = env.step(actions)
-            observations = next_observations
+    while len(ep_returns) < num_episodes:
+        actions = predict(policy, observations)
+        next_observations, rewards, dones, _ = env.step(actions)
+        observations = next_observations
 
-            for i, (reward, done) in enumerate(zip(rewards, dones)):
-                acc_returns[i] += reward
-                if done:
-                    ep_returns.append(acc_returns[i])
-                    acc_returns[i] = 0
-                    pbar.update(1)
+        for i, (reward, done) in enumerate(zip(rewards, dones)):
+            acc_returns[i] += reward
+            if done:
+                ep_returns.append(acc_returns[i])
+                acc_returns[i] = 0
+                i += 1
 
     return np.mean(ep_returns), np.std(ep_returns)
 
@@ -279,8 +341,12 @@ class SimpleCollector:
 
         observations = self.observations
         for _ in tqdm(range(num_steps), disable=not progress_bar):
+            # ts = time.time()
             actions = predict(policy, observations)
+            # print(f"Time taken for predict: {time.time() - ts}")
+            # ts = time.time()
             next_observations, rewards, dones, _ = self.env.step(actions)
+            # print(f"Time taken for step: {time.time() - ts}")
 
             acc_observations.append(observations)
             acc_actions.append(actions)
