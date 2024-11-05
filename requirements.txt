@@ -8,10 +8,10 @@ jax-cuda12-plugin==0.4.28
 jaxlib==0.4.28
 optax==0.2.3
 orbax-checkpoint==0.1.6
-gymnasium==0.29.1
-mujoco==3.2.1
-mujoco-mjx==3.2.1
+gymnasium==1.0.0
+mujoco==3.2.4
+mujoco-mjx==3.2.4
 numpy==1.24.4
-stable_baselines3==2.4.0a7
+stable_baselines3==2.4.0a11
 typer==0.12.3
 scipy==1.14.0
