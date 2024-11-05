@@ -132,7 +132,6 @@ class InvertedPendulum_v5(BaseEnv):
         diff_env = envs.DiffInvertedPendulum_v5(
             frame_skip=frame_skip, reset_noise_scale=reset_noise_scale
         )
-        self.diff_env = diff_env
 
         self._reset_noise_scale = reset_noise_scale
 

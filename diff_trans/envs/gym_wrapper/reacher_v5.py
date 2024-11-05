@@ -157,7 +157,6 @@ class Reacher_v5(BaseEnv):
         **kwargs,
     ):
         diff_env = envs.DiffReacher_v5(frame_skip=frame_skip)
-        self.diff_env = diff_env
 
         self._reward_dist_weight = reward_dist_weight
         self._reward_control_weight = reward_control_weight

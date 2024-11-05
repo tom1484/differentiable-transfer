@@ -46,6 +46,8 @@ class BaseEnv(VecEnv):
 
         self.max_episode_steps = max_episode_steps
 
+        self.diff_env = diff_env
+
         self.observation_space = observation_space
         self.action_space = action_space
         self.num_parameter = diff_env.num_parameter
@@ -74,7 +76,7 @@ class BaseEnv(VecEnv):
 
         # Compile the JIT functions for the environment for faster runtime
         if precompile:
-            diff_env.compile(num_envs)
+            self.diff_env.compile(num_envs)
 
     def reset(self):
         """
@@ -239,8 +241,8 @@ class BaseEnv(VecEnv):
     def get_model_parameter(self) -> jnp.ndarray:
         return self.diff_env._get_parameter()
 
-    def set_model_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
-        return self.diff_env._set_parameter(parameter)
+    def set_model_parameter(self, parameter: jnp.ndarray):
+        self.diff_env.model = self.diff_env._set_parameter(parameter)
 
     def create_gym_env(
         self, parameter: Optional[np.ndarray] = None, **kwargs

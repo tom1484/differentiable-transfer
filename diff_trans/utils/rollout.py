@@ -11,7 +11,7 @@ def squeeze_array_envs(array: jnp.ndarray):
     return jnp.transpose(array, (1, 0, *list(range(2, num_dims))))
 
 
-def rollout_transitions(env: BaseEnv, model, num_transitions=100):
+def rollout_transitions(env: BaseEnv | SubprocVecEnv, model, num_transitions=100):
     num_envs = env.num_envs
 
     num_steps = num_transitions // num_envs

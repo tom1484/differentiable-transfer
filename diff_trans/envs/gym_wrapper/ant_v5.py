@@ -255,7 +255,6 @@ class Ant_v5(BaseEnv):
             exclude_current_positions_from_observation=exclude_current_positions_from_observation,
             include_cfrc_ext_in_observation=include_cfrc_ext_in_observation,
         )
-        self.diff_env = diff_env
 
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight

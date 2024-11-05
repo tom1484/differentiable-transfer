@@ -195,7 +195,6 @@ class Walker2d_v5(BaseEnv):
             reset_noise_scale=reset_noise_scale,
             exclude_current_positions_from_observation=exclude_current_positions_from_observation,
         )
-        self.diff_env = diff_env
 
         self._forward_reward_weight = forward_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
