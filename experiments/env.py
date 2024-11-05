@@ -25,6 +25,7 @@ def set_env_vars(
     xla_preallocate: bool = False,
     jax_debug_nans: bool = True,
     jax_traceback_filtering: bool = False,
+    jax_platforms: Optional[str] = None,
     cuda_visible_devices: Optional[List[int]] = None,
 ):
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = flag_str(
@@ -34,6 +35,8 @@ def set_env_vars(
     os.environ["JAX_TRACEBACK_FILTERING"] = flag_str(
         jax_traceback_filtering, FlagType.SWITCH
     )
+    if jax_platforms is not None:
+        os.environ["JAX_PLATFORMS"] = jax_platforms
     if cuda_visible_devices is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = flag_str(
             cuda_visible_devices, FlagType.LIST

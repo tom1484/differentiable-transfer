@@ -50,7 +50,7 @@ class FetchSlideConfig_v1(BaseDiffEnv):
         # return self.data.replace(qpos=qpos, qvel=qvel)
         pass
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         # friction = self.model.geom_friction.copy()
         # frictionloss = self.model.dof_frictionloss.copy()
         # armature = self.model.dof_armature.copy()
@@ -68,7 +68,7 @@ class FetchSlideConfig_v1(BaseDiffEnv):
         # )
         pass
 
-    def set_parameter(self, env_model: mjx.Model, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, env_model: mjx.Model, parameter: jnp.ndarray) -> mjx.Model:
         # friction = env_model.geom_friction
         # friction = friction.at[0, :1].set(parameter[:1])
 

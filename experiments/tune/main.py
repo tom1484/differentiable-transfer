@@ -25,11 +25,15 @@ class CONFIG:
 
     max_tune_epochs: int = 10
     loss_rollout_length: int = 1000
+
     adapt_learning_rate: float = 1e-2
+    gradient_steps: int = 1
 
     adapt_max_timesteps: int = 50000
     adapt_threshold: float = 150
     adapt_num_envs: int = 16
+
+    continue_training: bool = False
 
     eval_num_episodes: int = 256
     eval_frequency: int = 10000
@@ -116,9 +120,9 @@ def main(
     import optax
 
     # from sbx import PPO
-    from stable_baselines3.common.evaluation import evaluate_policy
+    # from stable_baselines3.common.evaluation import evaluate_policy
 
-    from diff_trans.envs.gym import get_env
+    from diff_trans.envs.gym_wrapper import get_env
     from diff_trans.utils.loss import single_transition_loss
     from diff_trans.utils.rollout import rollout_transitions, evaluate_policy
     from diff_trans.utils.callbacks import (
@@ -126,7 +130,7 @@ def main(
         EvalCallback,
     )
 
-    from utils.exp import convert_arg_array
+    from experiments.utils.exp import convert_arg_array
     from constants import ALGORITHMS
 
     Algorithm = ALGORITHMS[config.algorithm]
@@ -138,14 +142,14 @@ def main(
 
     def create_env(Env, parameter: Optional[jnp.ndarray] = None):
         env = Env(num_envs=config.adapt_num_envs)
-        env_conf = env.env
+        env_conf = env.diff_env
 
         if parameter is not None:
             env_conf.model = env_conf.set_parameter(parameter)
 
         # env for evaluation
         eval_env = Env(num_envs=config.eval_num_episodes)
-        eval_env.env.model = env_conf.model
+        eval_env.diff_env.model = env_conf.model
 
         return env, env_conf, eval_env
 
@@ -230,6 +234,7 @@ def main(
             optimizer = optax.adam(config.adapt_learning_rate)
             opt_state = optimizer.init(parameter_subset)
             preal_steps = 0
+            last_model_path = None
 
             for i in range(config.max_tune_epochs):
                 print(f"Iteration {i}")
@@ -242,6 +247,14 @@ def main(
                     "MlpPolicy", sim_env, verbose=0, **config.algorithm_config
                 )
                 model_path = os.path.join(models_dir, f"{model_name}.zip")
+
+                print("Model path:", model_path)
+                if os.path.exists(model_path):
+                    print("Loading model from", model_path)
+                    model.load(model_path)
+                elif config.continue_training and last_model_path is not None:
+                    print("Loading model from", last_model_path)
+                    model.load(last_model_path)
 
                 callback_on_best = StopTrainingOnRewardThreshold(
                     reward_threshold=config.adapt_threshold, verbose=1
@@ -269,7 +282,9 @@ def main(
                     preal_eval_env, model, config.eval_num_episodes
                 )
                 print(f"Preal eval: {preal_eval}\n")
+
                 model.save(model_path)
+                last_model_path = model_path
 
                 rollouts = rollout_transitions(
                     preal_env, model, num_transitions=config.loss_rollout_length

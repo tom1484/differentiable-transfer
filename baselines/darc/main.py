@@ -13,7 +13,7 @@ from torchrl.data import TensorDictReplayBuffer, LazyTensorStorage
 from .models import ActorNet, QValueNet, ValueNet, ClassifierNet
 from .agent import DarcAgent, SimpleCollector
 
-from diff_trans.envs.gym import get_env
+from diff_trans.envs.gym_wrapper import get_env
 
 
 def main(

@@ -1,9 +1,12 @@
+from typing import Optional
+
 import numpy as np
 
 from jax import numpy as jnp
 from jax import random
 
 from mujoco import mjx
+from gymnasium import Env
 
 from .base import BaseDiffEnv
 
@@ -35,6 +38,7 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
         self._reset_noise_scale = reset_noise_scale
 
         # fmt: off
+        self.num_parameter = 8
         self.parameter_range = jnp.array(
             [
                 [
@@ -69,7 +73,7 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
 
         return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         frictionloss = self.model.dof_frictionloss.copy()
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
@@ -84,7 +88,7 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
             ]
         )
 
-    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         frictionloss = self.model.dof_frictionloss
         frictionloss = frictionloss.at[np.array([0, 1])].set(parameter[:2])
 
@@ -103,6 +107,9 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
             dof_damping=damping,
             body_mass=mass,
         )
+
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
+        raise NotImplementedError()
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # TODO: Use parallelized version

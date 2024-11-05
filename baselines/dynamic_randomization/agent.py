@@ -9,7 +9,7 @@ from .actor import Actor
 from .critic import Critic
 from .noise import OrnsteinUhlenbeckActionNoise
 
-from diff_trans.envs.gym import BaseEnv
+from diff_trans.envs.gym_wrapper import BaseEnv
 
 
 MAX_STEPS = 50

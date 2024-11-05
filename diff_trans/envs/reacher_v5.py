@@ -1,12 +1,14 @@
-import numpy as np
+from typing import Optional
 
+import numpy as np
 from jax import numpy as jnp
 from jax import random
 
 from mujoco import mjx
+from gymnasium.envs.mujoco.mujoco_env import MujocoEnv
+from gymnasium import make
 
 from .base import BaseDiffEnv
-from .utils.array import sidx
 
 
 class DiffReacher_v5(BaseDiffEnv):
@@ -33,6 +35,7 @@ class DiffReacher_v5(BaseDiffEnv):
         )
 
         # fmt: off
+        self.num_parameter = 7
         self.parameter_range = jnp.array(
             [
                 [
@@ -75,7 +78,7 @@ class DiffReacher_v5(BaseDiffEnv):
 
         return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
         mass = self.model.body_mass.copy()
@@ -88,7 +91,7 @@ class DiffReacher_v5(BaseDiffEnv):
             ]
         )
 
-    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         armature = self.model.dof_armature
         armature = armature.at[:2].set(parameter[:2])
 
@@ -103,6 +106,20 @@ class DiffReacher_v5(BaseDiffEnv):
             dof_damping=damping,
             body_mass=mass,
         )
+
+    def _create_gym_env(
+        self, parameter: Optional[np.ndarray] = None, **kwargs
+    ) -> MujocoEnv:
+        gym_env = make("Reacher-v5", **kwargs)
+
+        if parameter is not None:
+            model = gym_env.unwrapped.model
+
+            model.dof_armature[:2] = parameter[:2]
+            model.dof_damping[2:4] = parameter[2:4]
+            model.body_mass[1:4] = parameter[4:7]
+
+        return gym_env
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # TODO: Use parallelized version

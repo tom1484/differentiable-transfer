@@ -20,7 +20,7 @@ from tensordict.nn import TensorDictModule
 
 from gymnasium.spaces import Box
 
-from diff_trans.envs.gym import BaseEnv
+from diff_trans.envs.gym_wrapper import BaseEnv
 
 from .models import ActorNet, QValueNet, ValueNet, ClassifierNet
 

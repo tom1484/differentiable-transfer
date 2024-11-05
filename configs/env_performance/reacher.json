@@ -1,0 +1,10 @@
+{
+    "cuda_visible_devices": [1],
+    "algorithm": "SAC",
+    "algorithm_config": {},
+    "env_name": "Reacher-v5",
+    "timesteps": 500000,
+    "eval_num_episodes": 256,
+    "eval_frequency": 2000,
+    "log_wandb": true
+}

@@ -26,12 +26,12 @@ from gym.envs.mujoco import humanoid
 from gym.envs.mujoco import mujoco_env
 from gym.envs.mujoco import walker2d
 from gym.envs.mujoco import reacher
+from gym.vector import make
 import gym.spaces
 import numpy as np
 import reacher_7dof
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
-
 
 XML = """
 <mujoco model="cheetah">
@@ -291,6 +291,7 @@ def get_shifted_half_cheetah_env(param_ids: List[int], param_values: List[float]
         values[i] = v
 
     env = half_cheetah.HalfCheetahEnv()
+    # env = make("HalfCheetah-v3", num_envs=4)
     values = np.array(values, dtype=env.model.geom_friction.dtype)
 
     env.model.geom_friction[:1] = values[:1]

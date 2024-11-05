@@ -1,10 +1,11 @@
-from typing import Tuple, Union
+from typing import Optional
 
 import numpy as np
 from jax import numpy as jnp
 from jax import random, lax
 
 from mujoco import mjx
+from gymnasium import Env
 
 from .base import BaseDiffEnv
 
@@ -65,6 +66,7 @@ class DiffHumanoid_v5(BaseDiffEnv):
         self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
         # fmt: off
+        self.num_parameter = 18
         self.parameter_range = jnp.array(
             [
                 # [
@@ -136,6 +138,9 @@ class DiffHumanoid_v5(BaseDiffEnv):
     #     qvel = states[15:29]
 
     #     return data.replace(qpos=qpos, qvel=qvel)
+
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
+        raise NotImplementedError()
 
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         return data.replace(ctrl=control)

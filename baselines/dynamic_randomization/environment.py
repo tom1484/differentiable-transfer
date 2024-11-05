@@ -5,8 +5,8 @@ import gymnasium as gym
 import numpy as np
 import random
 
-from diff_trans.envs.gym import BaseEnv
-from diff_trans.envs.gym.utils.entry import get_env
+from diff_trans.envs.gym_wrapper import BaseEnv
+from diff_trans.envs.gym_wrapper.utils.entry import get_env
 
 # from mujoco._structs import MjModel
 

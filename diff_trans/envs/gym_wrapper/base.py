@@ -7,6 +7,7 @@ import mujoco
 import gymnasium as gym
 from gymnasium.spaces import Box
 from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
+from gymnasium import Env
 
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common import env_util
@@ -47,6 +48,7 @@ class BaseEnv(VecEnv):
 
         self.observation_space = observation_space
         self.action_space = action_space
+        self.num_parameter = diff_env.num_parameter
 
         assert self.metadata["render_modes"] == [
             "human",
@@ -234,6 +236,17 @@ class BaseEnv(VecEnv):
             for e in range(self.num_envs)
         ]
 
+    def get_model_parameter(self) -> jnp.ndarray:
+        return self.diff_env._get_parameter()
+
+    def set_model_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+        return self.diff_env._set_parameter(parameter)
+
+    def create_gym_env(
+        self, parameter: Optional[np.ndarray] = None, **kwargs
+    ) -> Env:
+        return self.diff_env._create_gym_env(parameter, **kwargs)
+
     def _init_renderer(
         self,
         model: "mujoco.MjModel",
@@ -277,15 +290,17 @@ class BaseEnv(VecEnv):
 
         return self.mujoco_renderer.render(
             self.render_mode,
-            self.camera_id,
-            self.camera_name,
+            # self.camera_id,
+            # self.camera_name,
         )
-        # return np.random.randint(0, 256, (self.height, self.width, 3))
 
     def render(self, select_envs: Optional[Union[int, List[int]]] = None) -> np.ndarray:
         """
         Render the environment for the given indices.
         """
+        # Needs fixing due to upgrading to gymnasium 1.0.0
+        raise NotImplementedError()
+
         if isinstance(select_envs, int):
             return self._render_single(select_envs)
 

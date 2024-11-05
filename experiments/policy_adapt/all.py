@@ -47,7 +47,7 @@ def main(
     from constants import ROOT_DIR
     from utils.path import get_exp_file_levels, create_exp_assets
 
-    from diff_trans.envs.gym import get_env
+    from diff_trans.envs.gym_wrapper import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
     # Create folders for the experiment

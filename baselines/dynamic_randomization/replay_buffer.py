@@ -4,7 +4,7 @@ from collections import deque
 import random
 import numpy as np
 
-from diff_trans.envs.gym.base import BaseEnv
+from diff_trans.envs.gym_wrapper.base import BaseEnv
 
 
 class SamplingSizeError(Exception):

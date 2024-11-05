@@ -12,7 +12,7 @@ from tqdm import tqdm
 from baselines.dynamic_randomization.environment import RandomizedEnvironment
 from baselines.dynamic_randomization.agent import Agent
 from baselines.dynamic_randomization.memory import EpisodicMemory
-from diff_trans.envs.gym import get_env
+from diff_trans.envs.gym_wrapper import get_env
 
 EPISODES = 2
 

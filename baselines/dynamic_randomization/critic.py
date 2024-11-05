@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-from diff_trans.envs.gym import BaseEnv
+from diff_trans.envs.gym_wrapper import BaseEnv
 
 UNITS = 128
 MAX_STEPS = 50

@@ -1,10 +1,11 @@
-from typing import Tuple, Union
+from typing import Optional
 
 import numpy as np
 from jax import numpy as jnp
 from jax import random, lax
 
 from mujoco import mjx
+from gymnasium import Env
 
 from .base import BaseDiffEnv
 
@@ -57,6 +58,7 @@ class DiffAnt_v5(BaseDiffEnv):
         self._include_cfrc_ext_in_observation = include_cfrc_ext_in_observation
 
         # fmt: off
+        self.num_parameter = 18
         self.parameter_range = jnp.array(
             [
                 [
@@ -88,7 +90,7 @@ class DiffAnt_v5(BaseDiffEnv):
 
         return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         friction = self.model.geom_friction.copy()
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
@@ -103,7 +105,7 @@ class DiffAnt_v5(BaseDiffEnv):
             ]
         )
 
-    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         friction = self.model.geom_friction
         friction = friction.at[0, :1].set(parameter[:1])
 
@@ -122,6 +124,9 @@ class DiffAnt_v5(BaseDiffEnv):
             dof_damping=damping,
             body_mass=mass,
         )
+
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
+        raise NotImplementedError()
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # TODO: Use parallelized version

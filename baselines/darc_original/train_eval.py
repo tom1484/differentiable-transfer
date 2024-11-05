@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import wandb
 import functools
 import os
 import time
@@ -101,6 +102,7 @@ def train_eval(
     delta_r_warmup=0,
     random_seed=0,
     checkpoint_dir=None,
+    run_name=None,
 ):
     """A simple train and eval for SAC."""
     np.random.seed(random_seed)
@@ -133,12 +135,14 @@ def train_eval(
     # else:
     #   raise NotImplementedError("Unknown environment: %s" % environment_name)
     if environment_name == "half_cheetah":
-        param_ids = [5]
-        param_values = [4.0]
+        param_ids = [1, 2]
+        param_values = [0.5, 0.5]
         max_episode_steps = 1000
     elif environment_name == "reacher":
-        param_ids = [0, 1]
-        param_values = [2.0, 2.0]
+        # param_ids = [0, 1]
+        # param_values = [2.0, 2.0]
+        param_ids = []
+        param_values = []
         max_episode_steps = 100
     else:
         raise NotImplementedError("Unknown environment: %s" % environment_name)
@@ -411,6 +415,15 @@ def train_eval(
         if use_tf_functions:
             train_step = common.function(train_step)
 
+        # Wandb
+        run_name = "-".join([run_name])
+        tags = ["darc", environment_name]
+        wandb.init(
+            project="differentiable-transfer",
+            name=run_name,
+            tags=tags,
+        )
+
         for _ in range(num_iterations):
             start_time = time.time()
             time_step, policy_state = collect_driver.run(
@@ -466,6 +479,13 @@ def train_eval(
                         summary_prefix="Metrics-%s" % eval_name,
                     )
                     metric_utils.log_metrics(eval_metrics)
+
+                    wandb.log(
+                        dict(
+                            global_step=global_step_val,
+                            **dict([(m.name, m.result()) for m in eval_metrics]),
+                        )
+                    )
 
             if global_step_val % train_checkpoint_interval == 0:
                 train_checkpointer.save(global_step=global_step_val)

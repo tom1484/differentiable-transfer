@@ -1,7 +1,7 @@
 import typer
-from typing import List, Union, Optional, Dict, Any
-from dataclasses import dataclass
-from dataclasses_json import dataclass_json
+from typing import List, Optional, Dict, Any
+
+from experiments.utils.config import *
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -12,18 +12,16 @@ app = typer.Typer(pretty_exceptions_show_locals=False)
 class CONFIG:
     cuda_visible_devices: Optional[List[str]] = None
 
-    algorithm: str = "PPO"
-    algorithm_config: Optional[Dict[str, Any]] = None
+    algorithm: str = "SAC"
+    algorithm_config: Dict[str, Any] = default_dict()
 
     env_name: str = "InvertedPendulum-v5"
-    num_envs: int = 256
 
-    timesteps: int = 1000000
+    timesteps: int = 500000
     eval_num_episodes: int = 256
-    eval_frequency: int = 10000
+    eval_frequency: int = 5000
 
     log_wandb: bool = False
-    debug_nans: bool = False
 
 
 # Main entry point for the experiment
@@ -37,10 +35,9 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
         print("Configuration created")
         return
 
-    # Set up JAX configuration
     set_env_vars(
-        jax_debug_nans=config.debug_nans,
         cuda_visible_devices=config.cuda_visible_devices,
+        jax_platforms="cpu",
     )
 
     import os
@@ -48,17 +45,22 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
     from diff_trans.envs.gym_wrapper import get_env
     from diff_trans.utils.rollout import evaluate_policy
-    from diff_trans.utils.callbacks import EvalCallback
+    from diff_trans.utils.callbacks import EvalCallback, SaveModelCallback
 
     from constants import ALGORITHMS
+    from stable_baselines3.common.vec_env import SubprocVecEnv
 
     Algorithm = ALGORITHMS[config.algorithm]
 
     # Initialize environments and parameters
+    print("Creating environment... ", end="")
     Env = get_env(config.env_name)
-    env = Env(num_envs=config.num_envs)
-    env_conf = env.diff_env
-    eval_env = Env(num_envs=config.eval_num_episodes)
+    diff_env = Env(precompile=False)
+
+    create_env = diff_env.create_gym_env
+    env = create_env()
+    eval_env = SubprocVecEnv([create_env for _ in range(32)])
+    print("Done")
 
     # Train baseline model
     model_name = f"{config.algorithm}-{config.env_name}"
@@ -69,7 +71,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
         run_name = "-".join([*exp_levels, name])
         tags = [*exp_levels, name, config.env_name, config.algorithm]
         wandb.init(
-            project="differentiable-transfer",
+            project="diff_trans-env_performance",
             name=run_name,
             tags=tags,
             config={
@@ -84,12 +86,14 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
         if config.log_wandb:
             wandb.log(metrics)
 
+    save_model_callback = SaveModelCallback(models_dir, base_name=model_name)
     eval_callback = EvalCallback(
         eval_env,
         n_eval_episodes=config.eval_num_episodes,
         callback_on_log=callback_on_log,
-        eval_freq=config.eval_frequency // env.num_envs,
-        verbose=0,
+        callback_after_eval=save_model_callback,
+        eval_freq=config.eval_frequency,
+        verbose=1,
     )
 
     # Train baseline model until performance threshold is reached

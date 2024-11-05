@@ -30,10 +30,10 @@ def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectorie
     next_observations = jnp.array(next_observations)
     actions = jnp.array(actions)
 
-    model = env.set_parameter(parameter)
-    data = env.data
-    # TODO: Do not use step_at_vj
-    _, next_observations_sim = sim.step_at_vj(env, model, data, observations, actions)
+    model = env._set_parameter(parameter)
+    data = env._state_to_data_vj_(env.data, observations)
+    data = sim.step_vj(env, model, data, actions)
+    next_observations_sim = env._get_obs_vj_(data)
 
     diff = next_observations - next_observations_sim
     loss = jnp.mean(jnp.sum(diff ** 2, axis=1))

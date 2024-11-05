@@ -1,0 +1,22 @@
+{
+    "cuda_visible_devices": [1],
+    "exp_start": 0,
+    "num_exp": 6,
+    "algorithm": "SAC",
+    "algorithm_config": {},
+    "env_name": "Reacher-v5",
+    "baseline_max_timesteps": 100000,
+    "baseline_threshold": -5.0,
+    "baseline_num_envs": 1,
+    "adapt_params": [0, 1],
+    "param_values": [2.0, 2.0],
+    "param_deviations": 0.0,
+    "adapt_max_timesteps": 100000,
+    "adapt_threshold": -5.0,
+    "adapt_num_envs": 1,
+    "eval_num_episodes": 256,
+    "eval_frequency": 512,
+    "log_wandb": true,
+    "override": true,
+    "debug_nans": false
+}

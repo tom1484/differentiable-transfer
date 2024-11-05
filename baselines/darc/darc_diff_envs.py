@@ -30,11 +30,11 @@ import reacher_7dof
 from tf_agents.environments import suite_gym
 from tf_agents.environments import tf_py_environment
 
-from diff_trans.envs.gym import ant_v5
-from diff_trans.envs.gym import half_cheetah_v5
-from diff_trans.envs.gym import humanoid_v5
-from diff_trans.envs.gym import walker2d_v5
-from diff_trans.envs.gym import reacher_v5
+from diff_trans.envs.gym_wrapper import ant_v5
+from diff_trans.envs.gym_wrapper import half_cheetah_v5
+from diff_trans.envs.gym_wrapper import humanoid_v5
+from diff_trans.envs.gym_wrapper import walker2d_v5
+from diff_trans.envs.gym_wrapper import reacher_v5
 
 
 class BrokenJoint(gym.Wrapper):

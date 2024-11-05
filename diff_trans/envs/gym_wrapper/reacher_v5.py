@@ -153,6 +153,7 @@ class Reacher_v5(BaseEnv):
         max_episode_steps: int = 50,
         reward_dist_weight: float = 1,
         reward_control_weight: float = 1,
+        precompile: bool = True,
         **kwargs,
     ):
         diff_env = envs.DiffReacher_v5(frame_skip=frame_skip)
@@ -165,12 +166,12 @@ class Reacher_v5(BaseEnv):
             low=-np.inf,
             high=np.inf,
             shape=(diff_env.state_dim,),
-            dtype=np.float32,
+            dtype=np.float64,
         )
         action_space = Box(
             low=diff_env.control_range[0],
             high=diff_env.control_range[1],
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         super().__init__(
@@ -180,6 +181,7 @@ class Reacher_v5(BaseEnv):
             observation_space=observation_space,
             action_space=action_space,
             default_camera_config=default_camera_config,
+            precompile=precompile,
             **kwargs,
         )
 

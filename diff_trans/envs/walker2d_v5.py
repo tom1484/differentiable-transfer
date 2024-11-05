@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Optional
 
 from jinja2 import pass_eval_context
 import numpy as np
@@ -6,6 +6,7 @@ from jax import numpy as jnp
 from jax import random, lax
 
 from mujoco import mjx
+from gymnasium import Env
 
 from .base import BaseDiffEnv
 
@@ -56,6 +57,7 @@ class DiffWalker2d_v5(BaseDiffEnv):
         )
 
         # fmt: off
+        self.num_parameter = 18
         self.parameter_range = jnp.array(
             [
                 [
@@ -87,7 +89,7 @@ class DiffWalker2d_v5(BaseDiffEnv):
 
         return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         # friction = self.model.geom_friction.copy()
         # armature = self.model.dof_armature.copy()
         # damping = self.model.dof_damping.copy()
@@ -103,7 +105,7 @@ class DiffWalker2d_v5(BaseDiffEnv):
         # )
         pass
 
-    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         # friction = self.model.geom_friction
         # friction = friction.at[0, :1].set(parameter[:1])
 
@@ -123,6 +125,9 @@ class DiffWalker2d_v5(BaseDiffEnv):
         #     body_mass=mass,
         # )
         pass
+
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
+        raise NotImplementedError()
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # qpos = states[:15]

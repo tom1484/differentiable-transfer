@@ -8,29 +8,10 @@ import numpy as np
 from stable_baselines3.common.logger import Logger
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback, CallbackList
 
-# try:
-#     from tqdm import TqdmExperimentalWarning
-
-#     # Remove experimental warning
-#     warnings.filterwarnings("ignore", category=TqdmExperimentalWarning)
-#     from tqdm.rich import tqdm
-# except ImportError:
-#     # Rich not installed, we only throw an error
-#     # if the progress bar is used
-#     tqdm = None
-
-
-# from stable_baselines3.common.evaluation import evaluate_policy
-# from stable_baselines3.common.vec_env import (
-#     DummyVecEnv,
-#     VecEnv,
-#     sync_envs_normalization,
-# )
-
 if TYPE_CHECKING:
     from stable_baselines3.common import base_class
 
-from diff_trans.envs.gym import BaseEnv
+from diff_trans.envs.gym_wrapper import BaseEnv
 from diff_trans.utils.rollout import evaluate_policy
 
 
@@ -100,11 +81,11 @@ class EvalCallback(EventCallback):
 
     def _init_callback(self) -> None:
         # Does not work in some corner cases, where the wrapper is not the same
-        if not isinstance(self.training_env, type(self.eval_env)):
-            warnings.warn(
-                "Training and eval env are not of the same type"
-                f"{self.training_env} != {self.eval_env}"
-            )
+        # if not isinstance(self.training_env, type(self.eval_env)):
+        #     warnings.warn(
+        #         "Training and eval env are not of the same type"
+        #         f"{self.training_env} != {self.eval_env}"
+        #     )
 
         # Init callback called on new best model
         if self.callback_on_new_best is not None:
@@ -133,19 +114,18 @@ class EvalCallback(EventCallback):
 
             if self.verbose >= 1:
                 print(
-                    f"Eval num_timesteps={self.num_timesteps}, "
-                    f"episode_reward={mean_return:.2f} +/- {std_return:.2f}"
+                    f"Eval num_timesteps={self.num_timesteps}\n"
+                    f"  episode_reward={mean_return:.2f} +/- {std_return:.2f}\n"
+                    f"  episode_length={mean_ep_length:.2f} +/- {std_ep_length:.2f}"
                 )
-                print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
-                
+
             metrics = {
                 "eval_mean_return": float(mean_return),
                 "eval_std_return": float(std_return),
                 "eval_mean_ep_length": mean_ep_length,
                 "eval_std_ep_length": std_ep_length,
-                "timesteps": self.num_timesteps
+                "timesteps": self.num_timesteps,
             }
-            print(metrics)
             if self.callback_on_log is not None:
                 self.callback_on_log(metrics)
 
@@ -153,7 +133,7 @@ class EvalCallback(EventCallback):
                 if self.verbose >= 1:
                     print("New best mean reward!")
                 self.best_mean_reward = float(mean_return)
-                
+
                 if self.callback_on_new_best is not None:
                     continue_training = self.callback_on_new_best.on_step()
 
@@ -203,3 +183,16 @@ class StopTrainingOnRewardThreshold(BaseCallback):
                 f" is above the threshold {self.reward_threshold}"
             )
         return continue_training
+
+
+class SaveModelCallback(BaseCallback):
+    def __init__(self, folder: str, base_name: str = "model", verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.folder = folder
+        self.base_name = base_name
+
+    def _on_step(self) -> bool:
+        self.model.save(
+            os.path.join(self.folder, f"{self.base_name}_{self.num_timesteps}")
+        )
+        return True

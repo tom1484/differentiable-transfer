@@ -21,6 +21,7 @@ class CONFIG:
     baseline_max_timesteps: int = 1000000
     baseline_threshold: float = 100
     baseline_num_envs: int = 256
+    baseline_eval_frequency: int = 10000
 
     adapt_params: Union[None, int, List[int]] = None
     param_values: Union[None, float, List[float]] = None
@@ -60,7 +61,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
 
     from jax import numpy as jnp
 
-    from diff_trans.envs.gym import get_env
+    from diff_trans.envs.gym_wrapper import get_env
     from diff_trans.utils.rollout import evaluate_policy
 
     from diff_trans.utils.callbacks import (
@@ -162,7 +163,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
             callback_on_new_best=callback_on_best,
             # callback_on_log=callback_on_log if config.log_wandb else None,
             callback_on_log=callback_on_log,
-            eval_freq=config.eval_frequency // sim_env.num_envs,
+            eval_freq=config.baseline_eval_frequency // sim_env.num_envs,
             verbose=0,
         )
 

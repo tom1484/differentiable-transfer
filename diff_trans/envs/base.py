@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Optional
 
 from os import path
 
@@ -10,6 +10,7 @@ import numpy as np
 
 import mujoco
 from mujoco import mjx
+from gymnasium import Env
 
 
 class BaseDiffEnv:
@@ -60,11 +61,16 @@ class BaseDiffEnv:
 
         # Initialize the JIT functions
         self.reset_vj = jax.jit(jax.vmap(self.reset))
+        self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
-        self._control_to_data_vj = jax.jit(
+        # Uncompiled functions
+        self._get_obs_vj_ = jax.jit(jax.vmap(self._get_obs))
+        self._state_to_data_vj_ = jax.jit(
+            jax.vmap(self._state_to_data, in_axes=(None, 0))
+        )
+        self._control_to_data_vj_ = jax.jit(
             jax.vmap(self._control_to_data, in_axes=(None, 0))
         )
-        self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
         # Prevent circular import
         from ..sim import step_vj
@@ -73,6 +79,7 @@ class BaseDiffEnv:
 
         # Set default values
         self._reset_noise_scale = 0
+        self.num_parameter = 0
         self.parameter_range = jnp.array([[0], [0]])
 
     def compile(self, num_envs: int):
@@ -87,9 +94,11 @@ class BaseDiffEnv:
         self._get_obs_vj = self._get_obs_vj.lower(data).compile()
 
         control = jnp.zeros((num_envs, self.control_dim))
-        self._control_to_data_vj = self._control_to_data_vj.lower(
-            data, control
-        ).compile()
+        # state = jnp.zeros((num_envs, self.state_dim))
+        # self._state_to_data_vj = self._state_to_data_vj.lower(data, state).compile()
+        # self._control_to_data_vj = self._control_to_data_vj.lower(
+        #     data, control
+        # ).compile()
 
         # Prevent circular import
         from ..sim import step_vj
@@ -179,10 +188,13 @@ class BaseDiffEnv:
     def reset(self, key: jnp.array) -> mjx.Data:
         NotImplementedError()
 
-    def get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jnp.ndarray:
         NotImplementedError()
 
-    def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+        NotImplementedError()
+
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> Env:
         NotImplementedError()
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:

@@ -126,6 +126,7 @@ class InvertedPendulum_v5(BaseEnv):
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         max_episode_steps: int = 1000,
         reset_noise_scale: float = 0.01,
+        precompile: bool = True,
         **kwargs,
     ):
         diff_env = envs.DiffInvertedPendulum_v5(
@@ -139,12 +140,12 @@ class InvertedPendulum_v5(BaseEnv):
             low=-np.inf,
             high=np.inf,
             shape=(diff_env.state_dim,),
-            dtype=np.float32,
+            dtype=np.float64,
         )
         action_space = Box(
             low=diff_env.control_range[0],
             high=diff_env.control_range[1],
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         super().__init__(
@@ -154,6 +155,7 @@ class InvertedPendulum_v5(BaseEnv):
             observation_space=observation_space,
             action_space=action_space,
             default_camera_config=default_camera_config,
+            precompile=precompile,
             **kwargs,
         )
 

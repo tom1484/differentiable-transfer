@@ -187,6 +187,7 @@ class Walker2d_v5(BaseEnv):
         healthy_angle_range: Tuple[float, float] = (-1.0, 1.0),
         reset_noise_scale: float = 5e-3,
         exclude_current_positions_from_observation: bool = True,
+        precompile: bool = True,
         **kwargs,
     ):
         diff_env = envs.DiffWalker2d_v5(
@@ -211,12 +212,12 @@ class Walker2d_v5(BaseEnv):
             low=-np.inf,
             high=np.inf,
             shape=(diff_env.state_dim,),
-            dtype=np.float32,
+            dtype=np.float64,
         )
         action_space = Box(
             low=diff_env.control_range[0],
             high=diff_env.control_range[1],
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         super().__init__(
@@ -226,6 +227,7 @@ class Walker2d_v5(BaseEnv):
             observation_space=observation_space,
             action_space=action_space,
             default_camera_config=default_camera_config,
+            precompile=precompile,
             **kwargs,
         )
 

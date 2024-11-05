@@ -1,4 +1,4 @@
-from diff_trans.envs.gym import InvertedPendulum_v5
+from diff_trans.envs.gym_wrapper import InvertedPendulum_v5
 from .base import DREnv
 
 
