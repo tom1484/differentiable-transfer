@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple, Type, TypeVar, cast
 
-import json
+from omegaconf import OmegaConf
 from jax import numpy as jnp
 
 from constants import ROOT_DIR
@@ -28,14 +28,14 @@ def load_config(
     name: str,
     CONFIG: Type[C],
     config_path: Optional[str] = None,
-) -> Tuple[Optional[C]]:
+) -> Tuple[Optional[C], List[str], str]:
     # Initialize default configuration
-    default_config = CONFIG()
+    default_config = OmegaConf.structured(CONFIG)
 
     # Create experiment assets (folders and default configuration)
     exp_levels = get_exp_file_levels("experiments", exp_filepath)
     new_config, default_config_path, models_dir = create_exp_assets(
-        ROOT_DIR, exp_levels, name, default_config.to_dict()
+        ROOT_DIR, exp_levels, name, default_config
     )
 
     if new_config:
@@ -45,9 +45,8 @@ def load_config(
         config_path = default_config_path
 
     # Load user-modified configuration
-    config_file = open(config_path, "r")
-    config_dict = json.load(config_file)
-    config_file.close()
+    config = OmegaConf.load(config_path)
+    config = OmegaConf.merge(default_config, config)
+    config = cast(CONFIG, config)
 
-    config = cast(CONFIG, CONFIG.from_dict(config_dict))
     return config, exp_levels, models_dir

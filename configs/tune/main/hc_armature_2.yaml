@@ -1,0 +1,36 @@
+cuda_visible_devices: [ 0 ]
+parallel_instances: null
+
+start_exp: 0
+num_exp: 3
+
+algorithm: SAC
+algorithm_config: null
+
+env_name: HalfCheetah-v5
+env_config:
+  exclude_current_positions_from_observation: false
+
+adapt_params: [ 1, 2 ]
+param_values: [ 0.3, 0.3 ]
+freeze_other_params: true
+
+train:
+  num_envs: 1
+  max_timesteps: 500000
+  threshold: 6000
+  load_last_model: true
+  use_checkpoint: true
+
+tune:
+  learning_rate: 0.05
+  gradient_steps: 10
+  epochs: 12
+  loss_rollout_length: 1000
+
+eval:
+  num_episodes: 256
+  frequency: 50000
+
+log_wandb: true
+debug_nans: true

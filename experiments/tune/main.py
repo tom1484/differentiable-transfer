@@ -1,15 +1,37 @@
+from typing import List, Optional, Dict, Any, Type, Tuple
+
 import typer
-from typing import List, Optional, Union, cast, Dict, Any
-from dataclasses import dataclass
-from dataclasses_json import dataclass_json
+from experiments.utils.config import *
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
-# Configuration dataclass for experiment settings
-@dataclass_json
 @dataclass
-class CONFIG:
+class TrainConfig:
+    num_envs: int = 16
+    max_timesteps: int = 50000
+    threshold: float = 150
+    load_last_model: bool = False
+    use_checkpoint: bool = False
+
+
+@dataclass
+class TuneConfig:
+    learning_rate: float = 1e-2
+    gradient_steps: int = 1
+    epochs: int = 10
+    loss_rollout_length: int = 1000
+
+
+@dataclass
+class EvalConfig:
+    num_episodes: int = 256
+    frequency: int = 10000
+
+
+# Configuration dataclass for experiment settings
+@dataclass
+class Config:
     cuda_visible_devices: Optional[List[str]] = None
     parallel_instances: Optional[int] = None
     start_exp: int = 0
@@ -17,26 +39,17 @@ class CONFIG:
 
     algorithm: str = "PPO"
     algorithm_config: Optional[Dict[str, Any]] = None
+
     env_name: str = "InvertedPendulum-v5"
+    env_config: Optional[Dict[str, Any]] = None
 
-    adapt_params: Union[None, int, List[int]] = None
-    param_values: Union[None, float, List[float]] = None
-    param_deviations: Union[float, List[float]] = 0.3
+    adapt_params: Optional[List[int]] = None
+    param_values: Optional[List[float]] = None
+    freeze_other_params: bool = True
 
-    max_tune_epochs: int = 10
-    loss_rollout_length: int = 1000
-
-    adapt_learning_rate: float = 1e-2
-    gradient_steps: int = 1
-
-    adapt_max_timesteps: int = 50000
-    adapt_threshold: float = 150
-    adapt_num_envs: int = 16
-
-    continue_training: bool = False
-
-    eval_num_episodes: int = 256
-    eval_frequency: int = 10000
+    train: TrainConfig = TrainConfig()
+    tune: TuneConfig = TuneConfig()
+    eval: EvalConfig = EvalConfig()
 
     log_wandb: bool = True
     debug_nans: bool = False
@@ -51,21 +64,25 @@ def main(
 ):
     import os
     import datetime
-    import json
     from experiments.utils.exp import load_config
 
     config, exp_levels, models_dir = load_config(
-        __file__, name, CONFIG, config_path=config_path
+        __file__, name, Config, config_path=config_path
     )
     if config is None:
         print("Configuration created")
         return
 
+    # print(config)
+    # return
+
     # Distribute experiments in tmux
     if config.num_exp > 0 and config.parallel_instances is not None:
         # import uuid
-        from utils.path import get_exp_module_name
-        from utils.tmux import create_grid_window
+        from experiments.utils.path import get_exp_module_name
+        from experiments.utils.tmux import create_grid_window
+
+        from omegaconf import OmegaConf
 
         os.makedirs("parallel_tmp", exist_ok=True)
 
@@ -94,7 +111,7 @@ def main(
             config.start_exp = start_exp
             config.num_exp = num_exp
             start_exp = start_exp + num_exp
-            json.dump(config.to_dict(), tmp_config_file)
+            OmegaConf.save(config, tmp_config_file)
 
             pane = window.panes[i]
             pane_commands = commands.copy()
@@ -110,28 +127,26 @@ def main(
         cuda_visible_devices=config.cuda_visible_devices,
     )
 
-    import jax
-    import torch
-
     import os
     import wandb
+    from omegaconf import OmegaConf
 
+    import jax
     import jax.numpy as jnp
     import optax
 
-    # from sbx import PPO
-    # from stable_baselines3.common.evaluation import evaluate_policy
-
-    from diff_trans.envs.gym_wrapper import get_env
+    from diff_trans.envs.gym_wrapper import get_env, BaseEnv
     from diff_trans.utils.loss import single_transition_loss
     from diff_trans.utils.rollout import rollout_transitions, evaluate_policy
     from diff_trans.utils.callbacks import (
         StopTrainingOnRewardThreshold,
         EvalCallback,
+        SaveBestModelCallback,
+        MultiCallback,
     )
 
-    from experiments.utils.exp import convert_arg_array
     from constants import ALGORITHMS
+    from utils import default
 
     Algorithm = ALGORITHMS[config.algorithm]
 
@@ -140,47 +155,50 @@ def main(
     if config.num_exp > 0:
         exp_end = exp_start + config.num_exp
 
-    def create_env(Env, parameter: Optional[jnp.ndarray] = None):
-        env = Env(num_envs=config.adapt_num_envs)
-        env_conf = env.diff_env
+    def create_env(
+        Env: Type[BaseEnv],
+        parameter: Optional[jnp.ndarray] = None,
+        precompile: bool = False,
+        eval_precompile: bool = False,
+    ) -> Tuple[BaseEnv, BaseEnv]:
+        env = Env(
+            num_envs=config.train.num_envs,
+            **default(config.env_config, {}),
+            precompile=precompile,
+        )
+        eval_env = Env(
+            num_envs=config.eval.num_episodes,
+            **default(config.env_config, {}),
+            precompile=eval_precompile,
+        )
 
         if parameter is not None:
-            env_conf.model = env_conf.set_parameter(parameter)
+            env.set_model_parameter(parameter)
+            eval_env.set_model_parameter(parameter)
 
-        # env for evaluation
-        eval_env = Env(num_envs=config.eval_num_episodes)
-        eval_env.diff_env.model = env_conf.model
+        return env, eval_env
 
-        return env, env_conf, eval_env
 
     # Get default parameter and parameter range
     Env = get_env(config.env_name)
-    sim_env, sim_env_conf, sim_eval_env = create_env(Env)
+    sim_env, sim_eval_env = create_env(Env)
+    sim_diff_env = sim_env.diff_env
 
-    default_parameter = sim_env_conf.get_parameter()
+    default_parameter = sim_env.get_model_parameter()
     num_parameters = default_parameter.shape[0]
-    parameter_range = sim_env_conf.parameter_range
-    parameter_min, parameter_max = parameter_range
+    # parameter_range = sim_diff_env.parameter_range
+    # parameter_min, parameter_max = parameter_range
 
     # Determine parameters to adapt and their values
-    if config.adapt_params is None:
-        adapt_param_ids = jnp.arange(0, num_parameters)
-    else:
-        adapt_param_ids = convert_arg_array(config.adapt_params, int)
+    adapt_param_ids = jnp.array(default(config.adapt_params, []), dtype=int)
+    values = jnp.array(default(config.param_values, []), dtype=float)
 
-    num_adapt_parameters = adapt_param_ids.shape[0]
-    if config.param_values is not None:
-        values = convert_arg_array(config.param_values, float, num_adapt_parameters)
-    else:
-        deviations = convert_arg_array(
-            config.param_deviations, float, num_adapt_parameters
-        )
-        values = (
-            default_parameter[adapt_param_ids]
-            + deviations * (parameter_max - default_parameter)[adapt_param_ids]
-        )
-
+    # Setup envs and parameters
     target_parameter = default_parameter.at[adapt_param_ids].set(values)
+    preal_env, preal_eval_env = create_env(Env, parameter=target_parameter)
+    param_mask = (
+        adapt_param_ids if config.freeze_other_params else jnp.arange(0, num_parameters)
+    )
 
     for exp_id in range(exp_start, exp_end):
         # Create run
@@ -193,35 +211,20 @@ def main(
                 config.env_name,
                 config.algorithm,
             ]
-            run = wandb.init(
+            wandb.init(
                 project="differentiable-transfer",
                 name=run_name,
                 tags=tags,
-                config={
-                    "id": exp_id,
-                    "algotithm": config.algorithm,
-                    "env_name": config.env_name,
-                    "param_deviations": config.param_deviations,
-                    "max_tune_epochs": config.max_tune_epochs,
-                    "loss_rollout_length": config.loss_rollout_length,
-                    "adapt_learning_rate": config.adapt_learning_rate,
-                    "adapt_max_timesteps": config.adapt_max_timesteps,
-                    "adapt_threshold": config.adapt_threshold,
-                    "adapt_num_envs": config.adapt_num_envs,
-                    "eval_num_episodes": config.eval_num_episodes,
-                },
+                config=OmegaConf.to_container(config),
             )
 
         try:
-            # Setup envs and parameters
-            preal_env, _, preal_eval_env = create_env(Env, parameter=target_parameter)
-
             print(f"Target parameter: {target_parameter}")
             print(f"Default parameter: {default_parameter}")
             print()
 
             def loss_of_single_param(parameter, rollouts):
-                return single_transition_loss(sim_env_conf, parameter, rollouts)
+                return single_transition_loss(sim_diff_env, parameter, rollouts)
 
             compute_loss_g = jax.grad(loss_of_single_param, argnums=0)
 
@@ -230,73 +233,117 @@ def main(
             print()
 
             parameter = default_parameter.copy()
-            parameter_subset = parameter[adapt_param_ids]
-            optimizer = optax.adam(config.adapt_learning_rate)
+            parameter_subset = parameter[param_mask]
+            optimizer = optax.adam(config.tune.learning_rate)
             opt_state = optimizer.init(parameter_subset)
             preal_steps = 0
             last_model_path = None
 
-            for i in range(config.max_tune_epochs):
+            for i in range(config.tune.epochs):
                 print(f"Iteration {i}")
                 print()
 
                 model_name = (
                     f"{config.algorithm}-{config.env_name}-{exp_id:02d}-{i:02d}"
                 )
-                model = Algorithm(
-                    "MlpPolicy", sim_env, verbose=0, **config.algorithm_config
-                )
                 model_path = os.path.join(models_dir, f"{model_name}.zip")
 
-                print("Model path:", model_path)
-                if os.path.exists(model_path):
-                    print("Loading model from", model_path)
-                    model.load(model_path)
-                elif config.continue_training and last_model_path is not None:
-                    print("Loading model from", last_model_path)
-                    model.load(last_model_path)
+                sim_gym_env = sim_env.create_gym_env(**default(config.env_config, {}))
+                model = Algorithm(
+                    "MlpPolicy",
+                    sim_gym_env,
+                    verbose=0,
+                    **default(config.algorithm_config, {}),
+                )
 
+                print("Model path:", model_path)
+                if config.train.load_last_model and last_model_path is not None:
+                    print("Loading model from", last_model_path)
+                    model = model.load(last_model_path, env=sim_gym_env)
+                elif config.train.use_checkpoint and os.path.exists(model_path):
+                    print("Loading model from", model_path)
+                    model = model.load(model_path, env=sim_gym_env)
+
+                save_best_model_callback = SaveBestModelCallback(
+                    model_path=model_path, verbose=1
+                )
                 callback_on_best = StopTrainingOnRewardThreshold(
-                    reward_threshold=config.adapt_threshold, verbose=1
+                    reward_threshold=config.train.threshold, verbose=1
                 )
                 eval_callback = EvalCallback(
                     sim_eval_env,
-                    n_eval_episodes=config.eval_num_episodes,
-                    callback_on_new_best=callback_on_best,
-                    # callback_on_log=callback_on_log if config.log_wandb else None,
-                    eval_freq=config.eval_frequency // sim_env.num_envs,
-                    verbose=0,
+                    n_eval_episodes=config.eval.num_episodes,
+                    callback_on_new_best=MultiCallback(
+                        [save_best_model_callback, callback_on_best]
+                    ),
+                    eval_freq=config.eval.frequency // sim_env.num_envs,
+                    verbose=1,
                 )
 
                 model.learn(
-                    total_timesteps=config.adapt_max_timesteps,
+                    total_timesteps=config.train.max_timesteps,
                     callback=eval_callback,
                     progress_bar=True,
                 )
-                # Evaluate model
-                sim_eval = evaluate_policy(
-                    sim_eval_env, model, config.eval_num_episodes
-                )
-                print(f"Sim eval: {sim_eval}")
-                preal_eval = evaluate_policy(
-                    preal_eval_env, model, config.eval_num_episodes
-                )
-                print(f"Preal eval: {preal_eval}\n")
 
-                model.save(model_path)
                 last_model_path = model_path
+                model = model.load(model_path, env=sim_gym_env)
 
-                rollouts = rollout_transitions(
-                    preal_env, model, num_transitions=config.loss_rollout_length
+                # Evaluate model
+                print("Evaluating sim model")
+                sim_eval = evaluate_policy(
+                    sim_eval_env,
+                    model,
+                    config.eval.num_episodes,
+                    progress_bar=True,
                 )
-                preal_steps += config.loss_rollout_length
+                print(f"Sim performance: {sim_eval[0]:6.2f} +/- {sim_eval[1]:6.2f}\n")
 
-                loss = loss_of_single_param(parameter, rollouts)
-                print(f"Loss: {loss}")
-                param_err = (parameter - target_parameter).mean()
-                print(f"Parameter error: {param_err}")
+                print("Evaluating preal model")
+                preal_eval = evaluate_policy(
+                    preal_eval_env,
+                    model,
+                    config.eval.num_episodes,
+                    progress_bar=True,
+                )
+                print(
+                    f"Preal performance: {preal_eval[0]:6.2f} +/- {preal_eval[1]:6.2f}\n"
+                )
+
+                print("Computing gradient")
+                rollouts = rollout_transitions(
+                    preal_env, model, num_transitions=config.tune.loss_rollout_length
+                )
+                preal_steps += config.tune.loss_rollout_length
+
+                for gi in range(config.tune.gradient_steps):
+                    print(f"  Gradient step {gi}")
+                    print(f"    Parameter = {parameter_subset}")
+                    loss = loss_of_single_param(parameter, rollouts)
+                    print(f"    Loss = {loss}")
+                    grad = compute_loss_g(parameter, rollouts)
+                    print(f"    Grad = {grad}")
+
+                    if jnp.isnan(grad).any():
+                        print("Nan in grad\n")
+                        raise ValueError("Nan in grad")
+
+                    wandb.log(
+                        dict(
+                            gradient_steps=i * config.tune.gradient_steps + gi,
+                            loss=loss,
+                        )
+                    )
+
+                    grad_subset = grad[param_mask]
+                    updates, opt_state = optimizer.update(grad_subset, opt_state)
+                    parameter_subset = optax.apply_updates(parameter_subset, updates)
+                    parameter = parameter.at[param_mask].set(parameter_subset)
 
                 if config.log_wandb:
+                    param_metrics = dict(
+                        (f"param_{i}", parameter[i]) for i in adapt_param_ids
+                    )
                     metrics = dict(
                         iteration=i,
                         preal_steps=preal_steps,
@@ -305,27 +352,16 @@ def main(
                         preal_eval_mean=preal_eval[0],
                         preal_eval_std=preal_eval[1],
                         loss=loss,
-                        param_err=param_err,
+                        **param_metrics,
                     )
                     wandb.log(metrics)
-
-                grad = compute_loss_g(parameter, rollouts)
-                print(f"Grad: {grad}")
-                if jnp.isnan(grad).any():
-                    print("Nan in grad\n")
-                    grad = jnp.zeros_like(grad)
-
-                grad_subset = grad[adapt_param_ids]
-                updates, opt_state = optimizer.update(grad_subset, opt_state)
-                parameter_subset = optax.apply_updates(parameter_subset, updates)
-                parameter = parameter.at[adapt_param_ids].set(parameter_subset)
 
                 print(f"Sim parameter: {parameter}")
                 print(f"Preal parameter: {target_parameter}")
                 print()
 
-                sim_env_conf.model = sim_env_conf.set_parameter(parameter)
-                sim_eval_env.diff_env.model = sim_env_conf.model
+                sim_env.set_model_parameter(parameter)
+                sim_eval_env.diff_env.model = sim_env.diff_env.model
 
                 del model
 
