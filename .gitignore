@@ -1,4 +1,9 @@
 wandb/
+outputs/
+configs/
+
+*.zip
+*.pt
 
 models/
 logs/
