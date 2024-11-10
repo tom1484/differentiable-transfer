@@ -31,8 +31,12 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         self,
         frame_skip: int,
         reset_noise_scale: float,
+        exclude_current_positions_from_observation: bool,
     ):
         observation_dim = 18
+        if exclude_current_positions_from_observation:
+            observation_dim -= 1
+
         super().__init__(
             "half_cheetah.xml",
             frame_skip,
@@ -40,6 +44,9 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         )
 
         self._reset_noise_scale = reset_noise_scale
+        self._exclude_current_positions_from_observation = (
+            exclude_current_positions_from_observation
+        )
 
         # fmt: off
         self.num_parameter = 6
@@ -127,7 +134,10 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # TODO: Use parallelized version
-        qpos = states[:9]
+        if self._exclude_current_positions_from_observation:
+            qpos = jnp.concatenate([jnp.zeros(1), states[1:9]])
+        else:
+            qpos = states[:9]
         qvel = states[9:]
         return data.replace(qpos=qpos, qvel=qvel)
 
@@ -135,5 +145,8 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         return data.replace(ctrl=control)
 
     def _get_obs(self, env_data: mjx.Data) -> np.ndarray:
-        return jnp.concatenate([env_data.qpos, env_data.qvel])
-        # return jnp.concatenate([env_data.qpos[1:], env_data.qvel])
+        if self._exclude_current_positions_from_observation:
+            qpos = env_data.qpos[1:]
+        else:
+            qpos = env_data.qpos
+        return jnp.concatenate([qpos, env_data.qvel])

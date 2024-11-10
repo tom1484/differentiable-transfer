@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 from jax import numpy as jnp
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
@@ -73,6 +75,7 @@ def evaluate_policy(
     model: BaseAlgorithm,
     n_eval_episodes: int = 128,
     return_episode_rewards: bool = False,
+    progress_bar: bool = False,
 ):
     obs = env.reset()
 
@@ -82,6 +85,9 @@ def evaluate_policy(
     episodes = 0
     episode_returns = []
     episode_lengths = []
+
+    if progress_bar:
+        bar = tqdm(total=n_eval_episodes)
 
     while True:
         actions = model.predict(obs)[0]
@@ -96,6 +102,9 @@ def evaluate_policy(
                 episode_lengths.append(env_lengths[i])
                 env_returns[i] = 0
                 env_lengths[i] = 0
+
+                if progress_bar:
+                    bar.update(1)
 
             if episodes >= n_eval_episodes:
                 if return_episode_rewards:

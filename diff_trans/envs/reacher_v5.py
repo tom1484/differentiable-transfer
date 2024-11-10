@@ -21,9 +21,11 @@ class DiffReacher_v5(BaseDiffEnv):
     | 1   | armature inertia of joint1 | 1.0       | 0.5   | 1.5   | hinge |
     | 2   | damping of joint0          | 1.0       | 0.5   | 1.5   | hinge |
     | 3   | damping of joint1          | 1.0       | 0.5   | 1.5   | hinge |
-    | 4   | mass of the arm0           | 0.0356047 | 0.018 | 0.056 |       |
-    | 5   | mass of the arm1           | 0.0356047 | 0.018 | 0.056 |       |
-    | 6   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
+    | 4   | friction loss of joint0    | 0.0       | 0.0   | 1.0   | hinge |
+    | 5   | friction loss of joint1    | 0.0       | 0.0   | 1.0   | hinge |
+    | 6   | mass of the arm0           | 0.0356047 | 0.018 | 0.056 |       |
+    | 7   | mass of the arm1           | 0.0356047 | 0.018 | 0.056 |       |
+    | 8   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
     """
 
     def __init__(self, frame_skip):
@@ -41,11 +43,13 @@ class DiffReacher_v5(BaseDiffEnv):
                 [
                     0.5, 0.5,  # armature
                     0.5, 0.5,  # damping
+                    0.0, 0.0,  # friction loss
                     0.018, 0.018, 0.002,  # mass
                 ],
                 [
                     1.5, 1.5,  # armature
                     1.5, 1.5,  # damping
+                    1.0, 1.0,  # friction loss
                     0.056, 0.056, 0.006,  # mass
                 ],
             ]
@@ -81,29 +85,35 @@ class DiffReacher_v5(BaseDiffEnv):
     def _get_parameter(self) -> jnp.ndarray:
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
+        friction_loss = self.model.dof_frictionloss.copy()
         mass = self.model.body_mass.copy()
 
         return jnp.concatenate(
             [
                 armature[:2],
                 damping[:2],
+                friction_loss[:2],
                 mass[1:4],
             ]
         )
 
     def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
         armature = self.model.dof_armature
-        armature = armature.at[:2].set(parameter[:2])
+        armature = armature.at[0:2].set(parameter[0:2])
 
         damping = self.model.dof_damping
-        damping = damping.at[2:4].set(parameter[2:4])
+        damping = damping.at[0:2].set(parameter[2:4])
+
+        friction_loss = self.model.dof_frictionloss
+        friction_loss = friction_loss.at[0:2].set(parameter[4:6])
 
         mass = self.model.body_mass
-        mass = mass.at[1:4].set(parameter[4:7])
+        mass = mass.at[1:4].set(parameter[6:9])
 
         return self.model.replace(
             dof_armature=armature,
             dof_damping=damping,
+            dof_frictionloss=friction_loss,
             body_mass=mass,
         )
 

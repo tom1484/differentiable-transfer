@@ -51,7 +51,7 @@ class BaseDiffEnv:
         # Initialize the state and control dimensions
         self.state_dim = observation_dim
         ctrlrange = mj_model.actuator_ctrlrange.copy()
-        low, high = ctrlrange.T
+        low, high = ctrlrange.T.astype(np.float32)
         self.control_range = (low, high)
         self.control_dim = ctrlrange.shape[0]
 

@@ -173,9 +173,6 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         self.reward_threshold = reward_threshold
 
     def _on_step(self) -> bool:
-        assert (
-            self.parent is not None
-        ), "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
         continue_training = bool(self.parent.best_mean_reward < self.reward_threshold)
         if self.verbose >= 1 and not continue_training:
             print(
@@ -183,6 +180,35 @@ class StopTrainingOnRewardThreshold(BaseCallback):
                 f" is above the threshold {self.reward_threshold}"
             )
         return continue_training
+
+
+class MultiCallback(BaseCallback):
+    def __init__(self, callbacks: List[BaseCallback], verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.callbacks = callbacks
+
+    def _init_callback(self) -> None:
+        for callback in self.callbacks:
+            callback.parent = self.parent
+            callback.init_callback(self.model)
+
+    def _on_step(self) -> bool:
+        continue_training = True
+        for callback in self.callbacks:
+            continue_training = continue_training and callback.on_step()
+        return continue_training
+
+
+class SaveBestModelCallback(BaseCallback):
+    def __init__(self, model_path: str, verbose: int = 0):
+        super().__init__(verbose=verbose)
+        self.model_path = model_path
+
+    def _on_step(self) -> bool:
+        self.model.save(self.model_path)
+        if self.verbose >= 1:
+            print(f"Saved model to {self.model_path}")
+        return True
 
 
 class SaveModelCallback(BaseCallback):

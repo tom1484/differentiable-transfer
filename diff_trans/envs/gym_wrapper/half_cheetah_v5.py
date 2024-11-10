@@ -161,11 +161,14 @@ class HalfCheetah_v5(BaseEnv):
         forward_reward_weight: float = 1.0,
         ctrl_cost_weight: float = 0.1,
         reset_noise_scale: float = 0.1,
+        exclude_current_positions_from_observation: bool = True,
         precompile: bool = True,
         **kwargs,
     ):
         diff_env = envs.DiffHalfCheetah_v5(
-            frame_skip=frame_skip, reset_noise_scale=reset_noise_scale
+            frame_skip=frame_skip,
+            reset_noise_scale=reset_noise_scale,
+            exclude_current_positions_from_observation=exclude_current_positions_from_observation,
         )
 
         self._forward_reward_weight = forward_reward_weight
@@ -181,7 +184,7 @@ class HalfCheetah_v5(BaseEnv):
         action_space = Box(
             low=diff_env.control_range[0],
             high=diff_env.control_range[1],
-            dtype=np.float64,
+            dtype=np.float32,
         )
 
         super().__init__(

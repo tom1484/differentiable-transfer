@@ -359,7 +359,7 @@ class Humanoid_v5(BaseEnv):
         action_space = Box(
             low=diff_env.control_range[0],
             high=diff_env.control_range[1],
-            dtype=np.float64,
+            dtype=np.float32,
         )
 
         super().__init__(
