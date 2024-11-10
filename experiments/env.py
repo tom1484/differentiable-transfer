@@ -28,15 +28,20 @@ def set_env_vars(
     jax_platforms: Optional[str] = None,
     cuda_visible_devices: Optional[List[int]] = None,
 ):
+    # XLA preallocation
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = flag_str(
         xla_preallocate, FlagType.BOOL
     )
+    # JAX debug nans
     os.environ["JAX_DEBUG_NANS"] = flag_str(jax_debug_nans, FlagType.BOOL)
+    # JAX traceback filtering
     os.environ["JAX_TRACEBACK_FILTERING"] = flag_str(
         jax_traceback_filtering, FlagType.SWITCH
     )
+    # JAX platforms
     if jax_platforms is not None:
         os.environ["JAX_PLATFORMS"] = jax_platforms
+    # CUDA visible devices
     if cuda_visible_devices is not None:
         os.environ["CUDA_VISIBLE_DEVICES"] = flag_str(
             cuda_visible_devices, FlagType.LIST

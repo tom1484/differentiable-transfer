@@ -6,16 +6,15 @@ from experiments.utils.config import *
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
-# Configuration dataclass for experiment settings
-@dataclass_json
 @dataclass
-class CONFIG:
+class Config:
     cuda_visible_devices: Optional[List[str]] = None
 
     algorithm: str = "SAC"
-    algorithm_config: Dict[str, Any] = default_dict()
+    algorithm_config: Optional[Dict[str, Any]] = None
 
     env_name: str = "InvertedPendulum-v5"
+    env_config: Optional[Dict[str, Any]] = None
 
     timesteps: int = 500000
     eval_num_episodes: int = 256
@@ -30,7 +29,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     from experiments.utils.exp import load_config
     from experiments.env import set_env_vars
 
-    config, exp_levels, models_dir = load_config(__file__, name, CONFIG)
+    config, exp_levels, models_dir = load_config(__file__, name, Config)
     if config is None:
         print("Configuration created")
         return
@@ -57,14 +56,16 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     Env = get_env(config.env_name)
     diff_env = Env(precompile=False)
 
-    create_env = diff_env.create_gym_env
+    create_env = lambda: diff_env.create_gym_env(**default_dict(config.env_config, {}))
     env = create_env()
     eval_env = SubprocVecEnv([create_env for _ in range(32)])
     print("Done")
 
     # Train baseline model
     model_name = f"{config.algorithm}-{config.env_name}"
-    model = Algorithm("MlpPolicy", env, verbose=0, **config.algorithm_config)
+    model = Algorithm(
+        "MlpPolicy", env, verbose=0, **default_dict(config.algorithm_config, {})
+    )
     model_path = os.path.join(models_dir, f"{model_name}.zip")
 
     if config.log_wandb:
