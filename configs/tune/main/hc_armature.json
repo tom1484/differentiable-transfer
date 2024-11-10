@@ -16,12 +16,12 @@
     "loss_rollout_length": 1000,
     "adapt_learning_rate": 0.05,
     "gradient_steps": 10,
-    "adapt_max_timesteps": 1000,
+    "adapt_max_timesteps": 500000,
     "adapt_threshold": 3000,
     "adapt_num_envs": 1,
     "continue_training": true,
     "eval_num_episodes": 256,
-    "eval_frequency": 500,
+    "eval_frequency": 10000,
     "log_wandb": true,
     "debug_nans": true
 }

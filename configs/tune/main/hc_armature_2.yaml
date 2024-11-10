@@ -13,7 +13,7 @@ env_config:
 
 adapt_params: [ 1, 2 ]
 param_values: [ 0.3, 0.3 ]
-freeze_other_params: true
+freeze_other_params: false
 
 train:
   num_envs: 1
