@@ -271,12 +271,14 @@ class BaseEnv(VecEnv):
         self.camera_name = camera_name
         self.camera_id = camera_id
 
-        model.vis.global_.offwidth = self.width
-        model.vis.global_.offheight = self.height
+        # model.vis.global_.offwidth = self.width
+        # model.vis.global_.offheight = self.height
         self.mujoco_renderer = MujocoRenderer(
             model,
             data,
             default_cam_config=default_camera_config,
+            width=self.width,
+            height=self.height,
         )
 
     def _render_single(self, select_env: int) -> np.ndarray:
@@ -301,7 +303,7 @@ class BaseEnv(VecEnv):
         Render the environment for the given indices.
         """
         # Needs fixing due to upgrading to gymnasium 1.0.0
-        raise NotImplementedError()
+        # raise NotImplementedError()
 
         if isinstance(select_envs, int):
             return self._render_single(select_envs)

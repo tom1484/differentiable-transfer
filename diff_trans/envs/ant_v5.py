@@ -2,10 +2,11 @@ from typing import Optional
 
 import numpy as np
 from jax import numpy as jnp
-from jax import random, lax
+from jax import random
 
 from mujoco import mjx
-from gymnasium import Env
+from gymnasium.envs.mujoco import MujocoEnv
+from gymnasium import make
 
 from .base import BaseDiffEnv
 
@@ -44,6 +45,8 @@ class DiffAnt_v5(BaseDiffEnv):
         include_cfrc_ext_in_observation: bool = True,
     ):
         observation_dim = 29
+        observation_dim -= 2 * exclude_current_positions_from_observation
+        # TODO: Add contact force observation
 
         super().__init__(
             "ant.xml",
@@ -125,11 +128,23 @@ class DiffAnt_v5(BaseDiffEnv):
             body_mass=mass,
         )
 
-    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
-        raise NotImplementedError()
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> MujocoEnv:
+        gym_env = make("Ant-v5", **kwargs)
+
+        if parameter is not None:
+            model = gym_env.unwrapped.model
+
+            model.geom_friction[0, :1] = parameter[:1]
+            model.dof_armature[6:14] = parameter[1:9]
+            model.dof_damping[6:14] = parameter[9:17]
+            model.body_mass[1:2] = parameter[17:18]
+
+        return gym_env
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
-        # TODO: Use parallelized version
+        if self._exclude_current_positions_from_observation:
+            states = jnp.concatenate([jnp.zeros(2), states])
+
         qpos = states[:15]
         qvel = states[15:29]
 
@@ -138,6 +153,7 @@ class DiffAnt_v5(BaseDiffEnv):
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         return data.replace(ctrl=control)
 
+    # TODO: Add contact force observation
     # def contact_forces(self, data: mjx.Data) -> jnp.ndarray:
     #     raw_contact_forces = data.cfrc_ext.flatten()
     #     min_value, max_value = self._contact_force_range
@@ -149,13 +165,12 @@ class DiffAnt_v5(BaseDiffEnv):
         qpos = data.qpos
         qvel = data.qvel
 
-        # if self._exclude_current_positions_from_observation:
-        #     qpos = qpos[2:]
+        if self._exclude_current_positions_from_observation:
+            qpos = qpos[2:]
 
+        # TODO: Add contact force observation
         # if self._include_cfrc_ext_in_observation:
         #     contact_force = self.contact_forces(data)[1:]
         #     return jnp.concatenate([qpos, qvel, contact_force])
-        # else:
-        #     return jnp.concatenate([qpos, qvel])
 
         return jnp.concatenate([qpos, qvel])
