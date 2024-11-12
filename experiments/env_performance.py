@@ -2,6 +2,7 @@ import typer
 from typing import List, Optional, Dict, Any
 
 from experiments.utils.config import *
+from utils import default
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -56,7 +57,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     Env = get_env(config.env_name)
     diff_env = Env(precompile=False)
 
-    create_env = lambda: diff_env.create_gym_env(**default_dict(config.env_config, {}))
+    create_env = lambda: diff_env.create_gym_env(**default(config.env_config, {}))
     env = create_env()
     eval_env = SubprocVecEnv([create_env for _ in range(32)])
     print("Done")
@@ -64,7 +65,7 @@ def main(name: str = typer.Argument(..., help="Name of the experiment")):
     # Train baseline model
     model_name = f"{config.algorithm}-{config.env_name}"
     model = Algorithm(
-        "MlpPolicy", env, verbose=0, **default_dict(config.algorithm_config, {})
+        "MlpPolicy", env, verbose=0, **default(config.algorithm_config, {})
     )
     model_path = os.path.join(models_dir, f"{model_name}.zip")
 
