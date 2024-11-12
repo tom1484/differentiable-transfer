@@ -1,48 +1,15 @@
 import os
-import warnings
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, Dict, Any
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Dict, Any
 
-import gymnasium as gym
 import numpy as np
 
-from stable_baselines3.common.logger import Logger
-from stable_baselines3.common.callbacks import BaseCallback, EventCallback, CallbackList
-
-if TYPE_CHECKING:
-    from stable_baselines3.common import base_class
+from stable_baselines3.common.callbacks import BaseCallback, EventCallback
 
 from diff_trans.envs.gym_wrapper import BaseEnv
 from diff_trans.utils.rollout import evaluate_policy
 
 
 class EvalCallback(EventCallback):
-    """
-    Callback for evaluating an agent.
-
-    .. warning::
-
-      When using multiple environments, each call to  ``env.step()``
-      will effectively correspond to ``n_envs`` steps.
-      To account for that, you can use ``eval_freq = max(eval_freq // n_envs, 1)``
-
-    :param eval_env: The environment used for initialization
-    :param callback_on_new_best: Callback to trigger
-        when there is a new best model according to the ``mean_reward``
-    :param callback_after_eval: Callback to trigger after every evaluation
-    :param n_eval_episodes: The number of episodes to test the agent
-    :param eval_freq: Evaluate the agent every ``eval_freq`` call of the callback.
-    :param log_path: Path to a folder where the evaluations (``evaluations.npz``)
-        will be saved. It will be updated at each evaluation.
-    :param best_model_save_path: Path to a folder where the best model
-        according to performance on the eval env will be saved.
-    :param deterministic: Whether the evaluation should
-        use a stochastic or deterministic actions.
-    :param render: Whether to render or not the environment during evaluation
-    :param verbose: Verbosity level: 0 for no output, 1 for indicating information about evaluation results
-    :param warn: Passed to ``evaluate_policy`` (warns if ``eval_env`` has not been
-        wrapped with a Monitor wrapper)
-    """
-
     def __init__(
         self,
         eval_env: BaseEnv,
@@ -80,13 +47,6 @@ class EvalCallback(EventCallback):
         self.evaluations_successes: List[List[bool]] = []
 
     def _init_callback(self) -> None:
-        # Does not work in some corner cases, where the wrapper is not the same
-        # if not isinstance(self.training_env, type(self.eval_env)):
-        #     warnings.warn(
-        #         "Training and eval env are not of the same type"
-        #         f"{self.training_env} != {self.eval_env}"
-        #     )
-
         # Init callback called on new best model
         if self.callback_on_new_best is not None:
             self.callback_on_new_best.init_callback(self.model)
@@ -154,18 +114,6 @@ class EvalCallback(EventCallback):
 
 
 class StopTrainingOnRewardThreshold(BaseCallback):
-    """
-    Stop the training once a threshold in episodic reward
-    has been reached (i.e. when the model is good enough).
-
-    It must be used with the ``EvalCallback``.
-
-    :param reward_threshold:  Minimum expected reward per episode
-        to stop training.
-    :param verbose: Verbosity level: 0 for no output, 1 for indicating when training ended because episodic reward
-        threshold reached
-    """
-
     parent: EvalCallback
 
     def __init__(self, reward_threshold: float, verbose: int = 0):

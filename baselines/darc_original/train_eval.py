@@ -136,13 +136,15 @@ def train_eval(
     #   raise NotImplementedError("Unknown environment: %s" % environment_name)
     if environment_name == "half_cheetah":
         param_ids = [1, 2]
-        param_values = [0.5, 0.5]
+        param_values = [0.3, 0.3]
+        # param_ids = [5]
+        # param_values = [20]
         max_episode_steps = 1000
     elif environment_name == "reacher":
-        # param_ids = [0, 1]
-        # param_values = [2.0, 2.0]
-        param_ids = []
-        param_values = []
+        param_ids = [0, 1]
+        param_values = [0.13, 0.13]
+        # param_ids = []
+        # param_values = []
         max_episode_steps = 100
     else:
         raise NotImplementedError("Unknown environment: %s" % environment_name)
