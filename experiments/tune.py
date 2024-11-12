@@ -38,6 +38,7 @@ class Config:
     cuda_visible_devices: Optional[List[str]] = None
 
     num_exp: int = 1
+    verbose: int = 1
 
     algorithm: str = "SAC"
     algorithm_config: Optional[Dict[str, Any]] = None
@@ -212,30 +213,31 @@ def main(
             )
             self.rollouts.append(rollouts)
 
-        def tune(self):
-            if self.current_loss < self.tune_config.stop_tuning_below:
-                return
+        def get_loss(self):
+            loss = 0
+            for rollouts in self.rollouts:
+                loss += self.loss_function(
+                    self.sim_env.diff_env, self.parameter, rollouts
+                )
 
+            return loss / len(self.rollouts)
+
+        def get_grad(self):
+            grad = 0
+            for rollouts in self.rollouts:
+                grad += self.grad_function(
+                    self.sim_env.diff_env, self.parameter, rollouts
+                )
+
+            return grad / len(self.rollouts)
+
+        def tune(self):
             print(f"Tuning parameter...")
 
             for _ in range(self.tune_config.gradient_steps):
                 self.num_gradient_steps += 1
 
-                loss = 0
-                grad = 0
-
-                for rollouts in self.rollouts:
-                    loss += self.loss_function(
-                        self.sim_env.diff_env, self.parameter, rollouts
-                    )
-                    grad += self.grad_function(
-                        self.sim_env.diff_env, self.parameter, rollouts
-                    )
-
-                loss /= len(self.rollouts)
-                grad /= len(self.rollouts)
-
-                self.current_loss = loss.tolist()
+                grad = self.get_grad()
                 masked_grad = grad[self.parameter_mask]
 
                 updates, self.optimizer_state = self.optimizer.update(
@@ -253,9 +255,13 @@ def main(
 
                 self.update_env(self.parameter)
 
+                loss = self.get_loss()
+                self.current_loss = loss.tolist()
+
                 if self.verbose >= 1:
                     print(f"  Steps: {self.num_gradient_steps}")
                     print(f"    Loss: {self.current_loss:.6f}")
+                if self.verbose >= 2:
                     print(f"    Grad: {grad.tolist()}")
                     print(f"    Parameter: {self.parameter.tolist()}")
 
@@ -268,10 +274,10 @@ def main(
                     )
 
         def _on_step(self) -> bool:
-            continue_training = True
-
             if self.n_calls < self.tune_config.start_rollout_at:
-                return continue_training
+                return True
+            if self.current_loss < self.tune_config.stop_tuning_below:
+                return True
 
             if (
                 self.n_calls % self.tune_config.rollout_frequency == 0
@@ -282,7 +288,7 @@ def main(
             if self.n_calls % self.tune_config.tune_frequency == 0:
                 self.tune()
 
-            return continue_training
+            return True
 
     for exp_id in range(config.num_exp):
         # Create run
@@ -341,26 +347,38 @@ def main(
                 single_transition_loss,
                 config.tune,
                 log_wandb=config.log_wandb,
-                verbose=1,
+                verbose=config.verbose,
             )
 
             save_best_model_callback = SaveBestModelCallback(
-                model_path=model_path, verbose=1
+                model_path=model_path, verbose=config.verbose
             )
-            eval_callback = EvalCallback(
+
+            callback_on_log = (
+                (lambda metrics: wandb.log(metrics)) if config.log_wandb else None
+            )
+            sim_eval_callback = EvalCallback(
                 sim_eval_env,
+                prefix="sim_",
                 n_eval_episodes=config.eval.num_episodes,
                 callback_on_new_best=save_best_model_callback,
-                callback_on_log=(
-                    (lambda metrics: wandb.log(metrics)) if config.log_wandb else None
-                ),
-                eval_freq=config.eval.frequency // sim_env.num_envs,
-                verbose=1,
+                callback_on_log=callback_on_log,
+                eval_freq=config.eval.frequency // config.train.num_envs,
+                verbose=config.verbose,
+            )
+            preal_eval_callback = EvalCallback(
+                preal_eval_env,
+                prefix="preal_",
+                n_eval_episodes=config.eval.num_episodes,
+                callback_on_new_best=save_best_model_callback,
+                callback_on_log=callback_on_log,
+                eval_freq=config.eval.frequency // config.train.num_envs,
+                verbose=config.verbose,
             )
 
             model.learn(
                 total_timesteps=config.train.max_timesteps,
-                callback=[eval_callback, tune_callback],
+                callback=[sim_eval_callback, preal_eval_callback, tune_callback],
                 progress_bar=True,
             )
 
