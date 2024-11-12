@@ -17,14 +17,14 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
-    | Num | Parameter                                 | Default   | Min | Max | Joint |
-    |-----|-------------------------------------------|-----------|-----|-----|-------|
-    | 0   | slide friction of the floor               | 0.4       | 0.2 | 0.6 | slide |
-    | 1   | armature inertia of the back thigh rotor  | 0.1       | 0.0 | 0.3 | hinge |
-    | 2   | armature inertia of the front thigh rotor | 0.1       | 0.0 | 0.3 | hinge |
-    | 3   | damping of the back thigh rotor           | 6.0       | 3.0 | 9.0 | hinge |
-    | 4   | damping of the front thigh rotor          | 4.5       | 3.0 | 6.0 | hinge |
-    | 5   | mass of the torso                         | 6.2502093 | 4.0 | 8.0 |       |
+    | Num | Parameter                                 | Default   | Min   | Max   | Joint |
+    |-----|-------------------------------------------|-----------|-------|-------|-------|
+    | 0   | slide friction of the floor               | 0.4       | 0.001 | None  | slide |
+    | 1   | armature inertia of the back thigh rotor  | 0.1       | 0.001 | None  | hinge |
+    | 2   | armature inertia of the front thigh rotor | 0.1       | 0.001 | None  | hinge |
+    | 3   | damping of the back thigh rotor           | 6.0       | 0.001 | None  | hinge |
+    | 4   | damping of the front thigh rotor          | 4.5       | 0.001 | None  | hinge |
+    | 5   | mass of the torso                         | 6.2502093 | 0.001 | None  |       |
     """
 
     def __init__(
@@ -53,16 +53,16 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         self.parameter_range = jnp.array(
             [
                 [
-                    0.2,  # friction
-                    0.0, 0.0,  # armature
-                    3.0, 3.0,  # damping
-                    4.0,  # mass
+                    0.001,  # friction
+                    0.001, 0.001,  # armature
+                    0.001, 0.001,  # damping
+                    0.001,  # mass
                 ],
                 [
-                    0.6,  # friction
-                    0.3, 0.3,  # armature
-                    9.0, 6.0,  # damping
-                    8.0,  # mass
+                    jnp.inf,  # friction
+                    jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf,  # damping
+                    jnp.inf,  # mass
                 ],
             ]
         )

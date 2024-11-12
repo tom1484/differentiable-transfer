@@ -15,17 +15,17 @@ class DiffReacher_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
-    | Num | Parameter                  | Default   | Min   | Max   | Joint |
-    |-----|----------------------------|-----------|-------|-------|-------|
-    | 0   | armature inertia of joint0 | 1.0       | 0.5   | 1.5   | hinge |
-    | 1   | armature inertia of joint1 | 1.0       | 0.5   | 1.5   | hinge |
-    | 2   | damping of joint0          | 1.0       | 0.5   | 1.5   | hinge |
-    | 3   | damping of joint1          | 1.0       | 0.5   | 1.5   | hinge |
-    | 4   | friction loss of joint0    | 0.0       | 0.0   | 1.0   | hinge |
-    | 5   | friction loss of joint1    | 0.0       | 0.0   | 1.0   | hinge |
-    | 6   | mass of the arm0           | 0.0356047 | 0.018 | 0.056 |       |
-    | 7   | mass of the arm1           | 0.0356047 | 0.018 | 0.056 |       |
-    | 8   | mass of the fingertip      | 0.0041888 | 0.002 | 0.006 |       |
+    | Num | Parameter                  | Default   | Min   | Max  | Joint |
+    |-----|----------------------------|-----------|-------|------|-------|
+    | 0   | armature inertia of joint0 | 1.0       | 0.001 | None | hinge |
+    | 1   | armature inertia of joint1 | 1.0       | 0.001 | None | hinge |
+    | 2   | damping of joint0          | 1.0       | 0.001 | None | hinge |
+    | 3   | damping of joint1          | 1.0       | 0.001 | None | hinge |
+    | 4   | friction loss of joint0    | 0.001     | 0.001 | None | hinge |
+    | 5   | friction loss of joint1    | 0.001     | 0.001 | None | hinge |
+    | 6   | mass of the arm0           | 0.0356047 | 0.001 | None |       |
+    | 7   | mass of the arm1           | 0.0356047 | 0.001 | None |       |
+    | 8   | mass of the fingertip      | 0.0041888 | 0.001 | None |       |
     """
 
     def __init__(self, frame_skip):
@@ -41,16 +41,16 @@ class DiffReacher_v5(BaseDiffEnv):
         self.parameter_range = jnp.array(
             [
                 [
-                    0.5, 0.5,  # armature
-                    0.5, 0.5,  # damping
-                    0.0, 0.0,  # friction loss
-                    0.018, 0.018, 0.002,  # mass
+                    0.001, 0.001,  # armature
+                    0.001, 0.001,  # damping
+                    0.001, 0.001,  # friction loss
+                    0.001, 0.001, 0.001,  # mass
                 ],
                 [
-                    1.5, 1.5,  # armature
-                    1.5, 1.5,  # damping
-                    1.0, 1.0,  # friction loss
-                    0.056, 0.056, 0.006,  # mass
+                    jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf,  # damping
+                    jnp.inf, jnp.inf,  # friction loss
+                    jnp.inf, jnp.inf, jnp.inf,  # mass
                 ],
             ]
         )
