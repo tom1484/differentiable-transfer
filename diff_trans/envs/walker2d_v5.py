@@ -1,12 +1,12 @@
 from typing import Optional
 
-from jinja2 import pass_eval_context
 import numpy as np
 from jax import numpy as jnp
-from jax import random, lax
+from jax import random
 
 from mujoco import mjx
-from gymnasium import Env
+from gymnasium.envs.mujoco.mujoco_env import MujocoEnv
+from gymnasium import make
 
 from .base import BaseDiffEnv
 
@@ -15,26 +15,22 @@ class DiffWalker2d_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
-    | Num | Parameter                      | Default   | Min  | Max  | Joint |
-    |-----|--------------------------------|-----------|------|------|-------|
-    | 0   | slide friction of the floor    | 1.0       | 0.5  | 1.5  | slide |
-    | 1   | armature inertia of the hip1   | 1.0       | 0.5  | 1.5  | hinge |
-    | 2   | armature inertia of the ankle1 | 1.0       | 0.5  | 1.5  | hinge |
-    | 3   | armature inertia of the hip2   | 1.0       | 0.5  | 1.5  | hinge |
-    | 4   | armature inertia of the ankle2 | 1.0       | 0.5  | 1.5  | hinge |
-    | 5   | armature inertia of the hip3   | 1.0       | 0.5  | 1.5  | hinge |
-    | 6   | armature inertia of the ankle3 | 1.0       | 0.5  | 1.5  | hinge |
-    | 7   | armature inertia of the hip4   | 1.0       | 0.5  | 1.5  | hinge |
-    | 8   | armature inertia of the ankle4 | 1.0       | 0.5  | 1.5  | hinge |
-    | 9   | damping of the hip1            | 1.0       | 0.5  | 1.5  | hinge |
-    | 10  | damping of the ankle1          | 1.0       | 0.5  | 1.5  | hinge |
-    | 11  | damping of the hip2            | 1.0       | 0.5  | 1.5  | hinge |
-    | 12  | damping of the ankle2          | 1.0       | 0.5  | 1.5  | hinge |
-    | 13  | damping of the hip3            | 1.0       | 0.5  | 1.5  | hinge |
-    | 14  | damping of the ankle3          | 1.0       | 0.5  | 1.5  | hinge |
-    | 15  | damping of the hip4            | 1.0       | 0.5  | 1.5  | hinge |
-    | 16  | damping of the ankle4          | 1.0       | 0.5  | 1.5  | hinge |
-    | 17  | mass of the torso              | 0.3272492 | 0.16 | 0.48 |       |
+    | Num | Parameter                           | Default   | Min   | Max  | Joint |
+    |-----|-------------------------------------|-----------|-------|------|-------|
+    | 0   | slide friction of the floor         | 0.7       | 0.001 | None | slide |
+    | 1   | armature inertia of the right thigh | 0.01      | 0.001 | None | hinge |
+    | 2   | armature inertia of the right leg   | 0.01      | 0.001 | None | hinge |
+    | 3   | armature inertia of the right foot  | 0.01      | 0.001 | None | hinge |
+    | 4   | armature inertia of the left thigh  | 0.01      | 0.001 | None | hinge |
+    | 5   | armature inertia of the left leg    | 0.01      | 0.001 | None | hinge |
+    | 6   | armature inertia of the left foot   | 0.01      | 0.001 | None | hinge |
+    | 7   | damping of the right thigh          | 0.1       | 0.001 | None | hinge |
+    | 8   | damping of the right leg            | 0.1       | 0.001 | None | hinge |
+    | 9   | damping of the right foot           | 0.1       | 0.001 | None | hinge |
+    | 10  | damping of the left thigh           | 0.1       | 0.001 | None | hinge |
+    | 11  | damping of the left leg             | 0.1       | 0.001 | None | hinge |
+    | 12  | damping of the left foot            | 0.1       | 0.001 | None | hinge |
+    | 13  | mass of the torso                   | 3.6651914 | 0.001 | None |       |
     """
 
     def __init__(
@@ -44,6 +40,8 @@ class DiffWalker2d_v5(BaseDiffEnv):
         exclude_current_positions_from_observation: bool = True,
     ):
         observation_dim = 18
+        if exclude_current_positions_from_observation:
+            observation_dim -= 1
 
         super().__init__(
             "walker2d.xml",
@@ -57,20 +55,20 @@ class DiffWalker2d_v5(BaseDiffEnv):
         )
 
         # fmt: off
-        self.num_parameter = 18
+        self.num_parameter = 14
         self.parameter_range = jnp.array(
             [
                 [
-                    0.5,  # friction
-                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # armature
-                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # damping
-                    0.16,  # mass
+                    0.001,  # friction
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # armature
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # damping
+                    0.001,  # mass
                 ],
                 [
-                    1.5,  # friction
-                    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,  # armature
-                    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,  # damping
-                    0.48,  # mass
+                    jnp.inf,  # friction
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # damping
+                    jnp.inf,  # mass
                 ],
             ]
         )
@@ -90,51 +88,61 @@ class DiffWalker2d_v5(BaseDiffEnv):
         return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
     def _get_parameter(self) -> jnp.ndarray:
-        # friction = self.model.geom_friction.copy()
-        # armature = self.model.dof_armature.copy()
-        # damping = self.model.dof_damping.copy()
-        # mass = self.model.body_mass.copy()
+        friction = self.model.geom_friction.copy()
+        armature = self.model.dof_armature.copy()
+        damping = self.model.dof_damping.copy()
+        mass = self.model.body_mass.copy()
 
-        # return jnp.concatenate(
-        #     [
-        #         friction[0, 0:1],
-        #         armature[6:14],
-        #         damping[6:14],
-        #         mass[1:2],
-        #     ]
-        # )
-        pass
+        return jnp.concatenate(
+            [
+                friction[0, 0:1],
+                armature[3:9],
+                damping[3:9],
+                mass[1:2],
+            ]
+        )
 
     def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
-        # friction = self.model.geom_friction
-        # friction = friction.at[0, :1].set(parameter[:1])
+        friction = self.model.geom_friction
+        friction = friction.at[0, :1].set(parameter[:1])
 
-        # armature = self.model.dof_armature
-        # armature = armature.at[6:14].set(parameter[1:9])
+        armature = self.model.dof_armature
+        armature = armature.at[3:9].set(parameter[1:7])
 
-        # damping = self.model.dof_damping
-        # damping = damping.at[6:14].set(parameter[9:17])
+        damping = self.model.dof_damping
+        damping = damping.at[3:9].set(parameter[7:13])
 
-        # mass = self.model.body_mass
-        # mass = mass.at[1:2].set(parameter[17:18])
+        mass = self.model.body_mass
+        mass = mass.at[1:2].set(parameter[13:14])
 
-        # return self.model.replace(
-        #     geom_friction=friction,
-        #     dof_armature=armature,
-        #     dof_damping=damping,
-        #     body_mass=mass,
-        # )
-        pass
+        return self.model.replace(
+            geom_friction=friction,
+            dof_armature=armature,
+            dof_damping=damping,
+            body_mass=mass,
+        )
 
-    def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
-        raise NotImplementedError()
+    def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> MujocoEnv:
+        gym_env = make("Walker2d-v5", **kwargs)
+
+        if parameter is not None:
+            model = gym_env.unwrapped.model
+
+            model.geom_friction[0, :1] = parameter[:1]
+            model.dof_armature[3:9] = parameter[1:7]
+            model.dof_damping[3:9] = parameter[7:13]
+            model.body_mass[1:2] = parameter[13:14]
+
+        return gym_env
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
-        # qpos = states[:15]
-        # qvel = states[15:29]
+        if self._exclude_current_positions_from_observation:
+            states = jnp.concatenate([jnp.zeros(1), states])
 
-        # return data.replace(qpos=qpos, qvel=qvel)
-        pass
+        qpos = states[:9]
+        qvel = states[9:]
+
+        return data.replace(qpos=qpos, qvel=qvel)
 
     def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
         return data.replace(ctrl=control)
@@ -143,7 +151,7 @@ class DiffWalker2d_v5(BaseDiffEnv):
         qpos = data.qpos
         qvel = jnp.clip(data.qvel, -10, 10)
 
-        # if self._exclude_current_positions_from_observation:
-        #     qpos = qpos[1:]
+        if self._exclude_current_positions_from_observation:
+            qpos = qpos[1:]
 
         return jnp.concatenate([qpos, qvel])
