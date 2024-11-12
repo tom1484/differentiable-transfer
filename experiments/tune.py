@@ -43,9 +43,10 @@ class Config:
     env_name: str = "InvertedPendulum-v5"
     env_config: Optional[Dict[str, Any]] = None
 
-    adapt_params: Optional[List[int]] = None
+    param_ids: Optional[List[int]] = None
     param_values: Optional[List[float]] = None
-    freeze_other_params: bool = True
+    freeze_ids: Optional[List[int]] = None
+    freeze_all: bool = False
 
     train: TrainConfig = TrainConfig()
     tune: TuneConfig = TuneConfig()
@@ -178,7 +179,6 @@ def main(
 
         return env, eval_env
 
-
     # Get default parameter and parameter range
     Env = get_env(config.env_name)
     sim_env, sim_eval_env = create_env(Env)
@@ -186,19 +186,25 @@ def main(
 
     default_parameter = sim_env.get_model_parameter()
     num_parameters = default_parameter.shape[0]
-    # parameter_range = sim_diff_env.parameter_range
-    # parameter_min, parameter_max = parameter_range
+    parameter_min, parameter_max = sim_diff_env.parameter_range
 
     # Determine parameters to adapt and their values
-    adapt_param_ids = jnp.array(default(config.adapt_params, []), dtype=int)
-    values = jnp.array(default(config.param_values, []), dtype=float)
+    param_ids = jnp.array(default(config.param_ids, []), dtype=int)
+    param_values = jnp.array(default(config.param_values, []), dtype=float)
 
     # Setup envs and parameters
-    target_parameter = default_parameter.at[adapt_param_ids].set(values)
+    target_parameter = default_parameter.at[param_ids].set(param_values)
     preal_env, preal_eval_env = create_env(Env, parameter=target_parameter)
-    param_mask = (
-        adapt_param_ids if config.freeze_other_params else jnp.arange(0, num_parameters)
-    )
+
+    if config.freeze_all:
+        param_selections = param_ids
+    elif config.freeze_ids is not None:
+        param_selections = jnp.array(
+            [i for i in range(num_parameters) if i not in config.freeze_ids],
+            dtype=int,
+        )
+    else:
+        param_selections = jnp.arange(0, num_parameters, dtype=int)
 
     for exp_id in range(exp_start, exp_end):
         # Create run
@@ -233,7 +239,7 @@ def main(
             print()
 
             parameter = default_parameter.copy()
-            parameter_subset = parameter[param_mask]
+            parameter_subset = parameter[param_selections]
             optimizer = optax.adam(config.tune.learning_rate)
             opt_state = optimizer.init(parameter_subset)
             preal_steps = 0
@@ -335,14 +341,16 @@ def main(
                         )
                     )
 
-                    grad_subset = grad[param_mask]
+                    grad_subset = grad[param_selections]
                     updates, opt_state = optimizer.update(grad_subset, opt_state)
                     parameter_subset = optax.apply_updates(parameter_subset, updates)
-                    parameter = parameter.at[param_mask].set(parameter_subset)
+                    parameter = parameter.at[param_selections].set(parameter_subset)
+                    # Ensure parameter is within bounds
+                    parameter = jnp.clip(parameter, parameter_min, parameter_max)
 
                 if config.log_wandb:
                     param_metrics = dict(
-                        (f"param_{i}", parameter[i]) for i in adapt_param_ids
+                        (f"param_{i}", parameter[i]) for i in param_ids
                     )
                     metrics = dict(
                         iteration=i,
