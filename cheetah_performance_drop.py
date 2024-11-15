@@ -1,6 +1,6 @@
 from experiments.env import set_env_vars
 
-set_env_vars(jax_debug_nans=True, cuda_visible_devices=[1])
+set_env_vars(jax_debug_nans=True, cuda_visible_devices=[0])
 
 import sys
 import wandb
@@ -41,6 +41,30 @@ env = Env(
 default_parameters = env.get_model_parameter()
 
 model = SAC.load(MODEL_PATH, env=env)
+
+if TARGET == "friction_loss":
+    N = 15
+    default_friction_loss = default_parameters[0]
+    friction_loss_range = [0.1, 1.5]
+    friction_losses = np.linspace(friction_loss_range[0], friction_loss_range[1], N)
+
+    pbar = tqdm(friction_losses)
+    for friction_loss in pbar:
+        parameters = default_parameters.copy()
+        parameters = parameters.at[0].set(friction_loss)
+        env.set_model_parameter(parameters)
+
+        result = evaluate_policy(env, model, n_eval_episodes=EVAL_NUM_EPISODES)
+        pbar.write(f"Friction Loss: {friction_loss:4.6f}, Mean Return: {result[0]:4.2f}")
+
+        if LOG:
+            wandb.log(
+                dict(
+                    friction_loss=friction_loss,
+                    mean_return=result[0],
+                    std_return=result[1],
+                )
+            )
 
 if TARGET == "armature":
     N = 15
