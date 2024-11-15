@@ -380,7 +380,8 @@ def main(
                 print()
 
                 sim_env.set_model_parameter(parameter)
-                sim_eval_env.diff_env.model = sim_env.diff_env.model
+                sim_env.update_gym_env(sim_gym_env, parameter)
+                sim_eval_env.set_model_parameter(parameter)
 
                 del model
 
