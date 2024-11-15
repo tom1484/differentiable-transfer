@@ -18,6 +18,8 @@ class TrainConfig:
 class TuneConfig:
     stop_tuning_below: float = 1.0
     tune_frequency: int = 1000
+
+    batch_size: int = 100
     learning_rate: float = 1e-2
     gradient_steps: int = 1
 
@@ -83,9 +85,12 @@ def main(
         cuda_visible_devices=config.cuda_visible_devices,
     )
 
-    import os
     import wandb
     from omegaconf import OmegaConf
+
+    import os
+    import random
+    import time
 
     import jax
     import jax.numpy as jnp
@@ -95,13 +100,8 @@ def main(
 
     from diff_trans.envs.gym_wrapper import get_env, BaseEnv
     from diff_trans.utils.loss import single_transition_loss
-    from diff_trans.utils.rollout import rollout_transitions, evaluate_policy
-    from diff_trans.utils.callbacks import (
-        StopTrainingOnRewardThreshold,
-        EvalCallback,
-        SaveBestModelCallback,
-        MultiCallback,
-    )
+    from diff_trans.utils.rollout import rollout_transitions, Transition
+    from diff_trans.utils.callbacks import EvalCallback
 
     from constants import ALGORITHMS
     from utils import default
@@ -193,10 +193,12 @@ def main(
             self.current_loss = float("inf")
 
             self.num_rollouts = 0
-            self.rollouts = []
+            self.transitions: List[Transition] = []
 
             self.log_wandb = log_wandb
             self.verbose = verbose
+
+            self.noise_scale = 0.001
 
         def rollout(self):
             self.num_rollouts += 1
@@ -206,57 +208,93 @@ def main(
                     f"Collecting rollouts ({self.num_rollouts}/{self.tune_config.max_rollouts})"
                 )
 
-            rollouts = rollout_transitions(
+            trajectories = rollout_transitions(
                 self.preal_env,
                 self.model,
                 num_transitions=self.tune_config.rollout_timesteps,
             )
-            self.rollouts.append(rollouts)
+            for trajectory in trajectories:
+                self.transitions.extend(trajectory)
 
-        def get_loss(self):
-            loss = 0
-            for rollouts in self.rollouts:
-                loss += self.loss_function(
-                    self.sim_env.diff_env, self.parameter, rollouts
-                )
+        def sample_rollouts_compute(
+            self,
+            transitions: List[Transition],
+            compute_function: Callable[[List[Transition]], Any],
+        ) -> jnp.ndarray:
+            batch_size = self.tune_config.batch_size
+            num_batches = len(transitions) // batch_size
+            transitions = transitions[: num_batches * batch_size]
 
-            return loss / len(self.rollouts)
+            value = 0
+            for i in range(num_batches):
+                start_index = i * batch_size
+                end_index = (i + 1) * batch_size
+                transitions = self.transitions[start_index:end_index]
 
-        def get_grad(self):
-            grad = 0
-            for rollouts in self.rollouts:
-                grad += self.grad_function(
-                    self.sim_env.diff_env, self.parameter, rollouts
-                )
+                value += compute_function(transitions)
 
-            return grad / len(self.rollouts)
+            return value / num_batches
+
+        def compute_loss(self, parameter: jnp.ndarray):
+            return self.sample_rollouts_compute(
+                self.transitions,
+                lambda transitions: self.loss_function(
+                    self.sim_env.diff_env, parameter, transitions
+                ),
+            )
+
+        def compute_grad(self, parameter: jnp.ndarray):
+            return self.sample_rollouts_compute(
+                self.transitions,
+                lambda transitions: self.grad_function(
+                    self.sim_env.diff_env, parameter, transitions
+                ),
+            )
 
         def tune(self):
-            print(f"Tuning parameter...")
+            print(len(self.transitions))
+            if len(self.transitions) < self.tune_config.batch_size:
+                return
 
+            print(f"Tuning parameter...")
             for _ in range(self.tune_config.gradient_steps):
                 self.num_gradient_steps += 1
+                random.shuffle(self.transitions)
 
-                grad = self.get_grad()
+                grad = self.compute_grad(self.parameter)
                 masked_grad = grad[self.parameter_mask]
 
                 updates, self.optimizer_state = self.optimizer.update(
                     masked_grad, self.optimizer_state
                 )
-                self.masked_parameter = optax.apply_updates(
-                    self.masked_parameter, updates
-                )
-                self.parameter = self.parameter.at[self.parameter_mask].set(
-                    self.masked_parameter
-                )
-                self.parameter = jnp.clip(
-                    self.parameter, self.parameter_range[0], self.parameter_range[1]
+                masked_parameter = optax.apply_updates(self.masked_parameter, updates)
+                parameter = self.parameter.at[self.parameter_mask].set(masked_parameter)
+                parameter = jnp.clip(
+                    parameter, self.parameter_range[0], self.parameter_range[1]
                 )
 
-                self.update_env(self.parameter)
+                loss = self.compute_loss(parameter)
 
-                loss = self.get_loss()
+                if jnp.isnan(loss) or jnp.isnan(grad).any():
+                    print("Loss or grad is NaN, skipping update")
+
+                    key = jax.random.PRNGKey(time.time_ns())
+                    noise = jax.random.normal(key=key, shape=masked_parameter.shape)
+                    masked_parameter = self.masked_parameter + noise * self.noise_scale
+                    parameter = self.parameter.at[self.parameter_mask].set(
+                        masked_parameter
+                    )
+
+                    self.parameter = parameter
+                    self.masked_parameter = masked_parameter
+
+                    continue
+
                 self.current_loss = loss.tolist()
+                self.update_env(parameter)
+
+                self.parameter = parameter
+                self.masked_parameter = masked_parameter
 
                 if self.verbose >= 1:
                     print(f"  Steps: {self.num_gradient_steps}")
@@ -274,15 +312,14 @@ def main(
                     )
 
         def _on_step(self) -> bool:
-            if self.n_calls < self.tune_config.start_rollout_at:
-                return True
-            if self.current_loss < self.tune_config.stop_tuning_below:
+            if (
+                self.n_calls < self.tune_config.start_rollout_at
+                or self.current_loss < self.tune_config.stop_tuning_below
+                or self.num_rollouts >= self.tune_config.max_rollouts
+            ):
                 return True
 
-            if (
-                self.n_calls % self.tune_config.rollout_frequency == 0
-                and self.num_rollouts < self.tune_config.max_rollouts
-            ):
+            if self.n_calls % self.tune_config.rollout_frequency == 0:
                 self.rollout()
 
             if self.n_calls % self.tune_config.tune_frequency == 0:
@@ -335,6 +372,7 @@ def main(
 
             def update_env(parameter: jnp.ndarray):
                 sim_env.set_model_parameter(parameter)
+                sim_env.update_gym_env(sim_gym_env, parameter)
                 sim_eval_env.set_model_parameter(parameter)
 
             tune_callback = TuneCallback(
@@ -350,10 +388,6 @@ def main(
                 verbose=config.verbose,
             )
 
-            save_best_model_callback = SaveBestModelCallback(
-                model_path=model_path, verbose=config.verbose
-            )
-
             callback_on_log = (
                 (lambda metrics: wandb.log(metrics)) if config.log_wandb else None
             )
@@ -361,7 +395,6 @@ def main(
                 sim_eval_env,
                 prefix="sim_",
                 n_eval_episodes=config.eval.num_episodes,
-                callback_on_new_best=save_best_model_callback,
                 callback_on_log=callback_on_log,
                 eval_freq=config.eval.frequency // config.train.num_envs,
                 verbose=config.verbose,
@@ -370,7 +403,6 @@ def main(
                 preal_eval_env,
                 prefix="preal_",
                 n_eval_episodes=config.eval.num_episodes,
-                callback_on_new_best=save_best_model_callback,
                 callback_on_log=callback_on_log,
                 eval_freq=config.eval.frequency // config.train.num_envs,
                 verbose=config.verbose,
