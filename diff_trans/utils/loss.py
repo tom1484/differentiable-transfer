@@ -1,16 +1,14 @@
 from jax import numpy as jnp
-from typing import List, Tuple
+from typing import List
 
 from diff_trans.envs import BaseDiffEnv
 from diff_trans import sim
+from diff_trans.utils.rollout import Transition
 
 
-Trajectory = List[
-    Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
-]
-
-
-def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectories: List[Trajectory]):
+def single_transition_loss(
+    env: BaseDiffEnv, parameter: jnp.ndarray, transitions: List[Transition]
+):
     """
     Compute the loss for a single transition.
     This only works under full observability.
@@ -19,13 +17,12 @@ def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectorie
     next_observations = []
     actions = []
 
-    for trajectory in trajectories:
-        for observation, next_observation, action, _, done in trajectory:
-            if not done:
-                observations.append(observation)
-                next_observations.append(next_observation)
-                actions.append(action)
-    
+    for observation, next_observation, action, _, done in transitions:
+        if not done:
+            observations.append(observation)
+            next_observations.append(next_observation)
+            actions.append(action)
+
     observations = jnp.array(observations)
     next_observations = jnp.array(next_observations)
     actions = jnp.array(actions)
@@ -36,6 +33,6 @@ def single_transition_loss(env: BaseDiffEnv, parameter: jnp.ndarray, trajectorie
     next_observations_sim = env._get_obs_vj_(data)
 
     diff = next_observations - next_observations_sim
-    loss = jnp.mean(jnp.sum(diff ** 2, axis=1))
-    
+    loss = jnp.mean(jnp.sum(diff**2, axis=1))
+
     return loss

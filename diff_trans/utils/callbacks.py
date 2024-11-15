@@ -13,6 +13,7 @@ class EvalCallback(EventCallback):
     def __init__(
         self,
         eval_env: BaseEnv,
+        prefix: str = "",
         callback_on_new_best: Optional[BaseCallback] = None,
         callback_after_eval: Optional[BaseCallback] = None,
         callback_on_log: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -39,6 +40,8 @@ class EvalCallback(EventCallback):
         self.reward_threshold = reward_threshold
 
         self.eval_env = eval_env
+        self.prefix = prefix
+
         self.evaluations_results: List[List[float]] = []
         self.evaluations_timesteps: List[int] = []
         self.evaluations_length: List[List[int]] = []
@@ -74,16 +77,16 @@ class EvalCallback(EventCallback):
 
             if self.verbose >= 1:
                 print(
-                    f"Eval num_timesteps={self.num_timesteps}\n"
+                    f"Eval {self.prefix}num_timesteps={self.num_timesteps}\n"
                     f"  episode_reward={mean_return:.2f} +/- {std_return:.2f}\n"
                     f"  episode_length={mean_ep_length:.2f} +/- {std_ep_length:.2f}"
                 )
 
             metrics = {
-                "eval_mean_return": float(mean_return),
-                "eval_std_return": float(std_return),
-                "eval_mean_ep_length": mean_ep_length,
-                "eval_std_ep_length": std_ep_length,
+                f"{self.prefix}eval_mean_return": float(mean_return),
+                f"{self.prefix}eval_std_return": float(std_return),
+                f"{self.prefix}eval_mean_ep_length": mean_ep_length,
+                f"{self.prefix}eval_std_ep_length": std_ep_length,
                 "timesteps": self.num_timesteps,
             }
             if self.callback_on_log is not None:

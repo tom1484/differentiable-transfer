@@ -197,6 +197,9 @@ class BaseDiffEnv:
     def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> Env:
         NotImplementedError()
 
+    def _update_gym_env(self, gym_env: Env, parameter: jnp.ndarray):
+        NotImplementedError()
+
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         NotImplementedError()
 

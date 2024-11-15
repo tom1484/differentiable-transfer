@@ -123,14 +123,16 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         gym_env = make("HalfCheetah-v5", **kwargs)
 
         if parameter is not None:
-            model = gym_env.unwrapped.model
-
-            model.geom_friction[0, :1] = parameter[:1]
-            model.dof_armature[sidx(3, 6)] = parameter[1:3]
-            model.dof_damping[sidx(3, 6)] = parameter[3:5]
-            model.body_mass[1:2] = parameter[5:6]
+            self._update_gym_env(gym_env, parameter)
 
         return gym_env
+
+    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jnp.ndarray):
+        model = gym_env.unwrapped.model
+        model.geom_friction[0, :1] = parameter[:1]
+        model.dof_armature[sidx(3, 6)] = parameter[1:3]
+        model.dof_damping[sidx(3, 6)] = parameter[3:5]
+        model.body_mass[1:2] = parameter[5:6]
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         if self._exclude_current_positions_from_observation:

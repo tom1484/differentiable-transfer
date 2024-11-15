@@ -249,6 +249,9 @@ class BaseEnv(VecEnv):
     ) -> Env:
         return self.diff_env._create_gym_env(parameter, **kwargs)
 
+    def update_gym_env(self, gym_env: Env, parameter: jnp.ndarray):
+        self.diff_env._update_gym_env(gym_env, parameter)
+
     def _init_renderer(
         self,
         model: "mujoco.MjModel",

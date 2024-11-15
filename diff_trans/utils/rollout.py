@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 from tqdm import tqdm
 
 from jax import numpy as jnp
@@ -8,12 +10,18 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from ..envs.gym_wrapper import BaseEnv
 
 
+Transition = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
+Trajectory = List[Transition]
+
+
 def squeeze_array_envs(array: jnp.ndarray):
     num_dims = len(array.shape)
     return jnp.transpose(array, (1, 0, *list(range(2, num_dims))))
 
 
-def rollout_transitions(env: BaseEnv | SubprocVecEnv, model, num_transitions=100):
+def rollout_transitions(
+    env: BaseEnv | SubprocVecEnv, model, num_transitions=100
+) -> List[Trajectory]:
     num_envs = env.num_envs
 
     num_steps = num_transitions // num_envs

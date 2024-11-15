@@ -121,15 +121,16 @@ class DiffReacher_v5(BaseDiffEnv):
         self, parameter: Optional[np.ndarray] = None, **kwargs
     ) -> MujocoEnv:
         gym_env = make("Reacher-v5", **kwargs)
-
         if parameter is not None:
-            model = gym_env.unwrapped.model
-
-            model.dof_armature[:2] = parameter[:2]
-            model.dof_damping[2:4] = parameter[2:4]
-            model.body_mass[1:4] = parameter[4:7]
+            self._update_gym_env(gym_env, parameter)
 
         return gym_env
+
+    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jnp.ndarray):
+        model = gym_env.unwrapped.model
+        model.dof_armature[:2] = parameter[:2]
+        model.dof_damping[2:4] = parameter[2:4]
+        model.body_mass[1:4] = parameter[4:7]
 
     def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
         # TODO: Use parallelized version
