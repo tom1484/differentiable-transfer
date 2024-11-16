@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+import jax
 from jax import numpy as jnp
 
 from diff_trans.envs import BaseDiffEnv
@@ -9,7 +10,7 @@ from diff_trans.utils.rollout import Trajectory, Transition
 
 def extract_array_from_trajectories(
     trajectories: List[Trajectory],
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     states = []
     next_states = []
     actions = []
@@ -30,7 +31,7 @@ def extract_array_from_trajectories(
 
 def extract_array_from_transitions(
     transitions: List[Transition],
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     states = []
     next_states = []
     actions = []
@@ -50,10 +51,10 @@ def extract_array_from_transitions(
 
 def single_transition_loss(
     env: BaseDiffEnv,
-    parameter: jnp.ndarray,
-    states: jnp.ndarray,
-    next_states: jnp.ndarray,
-    actions: jnp.ndarray,
+    parameter: jax.Array,
+    states: jax.Array,
+    next_states: jax.Array,
+    actions: jax.Array,
 ):
     """
     Compute the loss for a single transition.

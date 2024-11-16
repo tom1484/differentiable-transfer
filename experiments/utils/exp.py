@@ -2,6 +2,8 @@ from typing import List, Optional, Tuple, Type, TypeVar, cast, Any
 
 import os
 from omegaconf import OmegaConf
+
+import jax
 from jax import numpy as jnp
 
 from constants import ROOT_DIR
@@ -12,7 +14,7 @@ T = TypeVar("T")
 
 def convert_arg_array(
     values: List[T], _type: Type[T], broadcast: Optional[int] = None
-) -> jnp.ndarray:
+) -> jax.Array:
     if type(values) is list:
         return jnp.array([_type(v) for v in values])
     elif broadcast is None:

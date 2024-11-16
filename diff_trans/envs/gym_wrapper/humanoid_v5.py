@@ -2,6 +2,7 @@ from typing import Dict, Tuple, Union
 
 from gymnasium.spaces import Box
 
+import jax
 from jax import numpy as jnp
 import numpy as np
 from mujoco import mjx
@@ -383,27 +384,27 @@ class Humanoid_v5(BaseEnv):
             "render_fps": int(np.round(1.0 / self.diff_env.dt)),
         }
 
-    def healthy_reward(self, data: mjx.Data) -> jnp.ndarray:
+    def healthy_reward(self, data: mjx.Data) -> jax.Array:
         return self.is_healthy(data) * self._healthy_reward
 
-    def control_cost(self, control: jnp.ndarray) -> jnp.ndarray:
+    def control_cost(self, control: jax.Array) -> jax.Array:
         control_cost = self._ctrl_cost_weight * jnp.sum(control**2, axis=1)
         return control_cost
 
-    def contact_forces(self, data: mjx.Data) -> jnp.ndarray:
+    def contact_forces(self, data: mjx.Data) -> jax.Array:
         raw_contact_forces = data.cfrc_ext
         min_value, max_value = self._contact_force_range
         contact_forces = jnp.clip(raw_contact_forces, min_value, max_value)
 
         return contact_forces
 
-    def contact_cost(self, data: mjx.Data) -> jnp.ndarray:
+    def contact_cost(self, data: mjx.Data) -> jax.Array:
         contact_cost = self._contact_cost_weight * jnp.sum(
             jnp.square(self.contact_forces(data)), axis=1
         )
         return contact_cost
 
-    def is_healthy(self, data: mjx.Data) -> jnp.ndarray:
+    def is_healthy(self, data: mjx.Data) -> jax.Array:
         state = self.get_state_vector(data)
         min_z, max_z = self._healthy_z_range
         is_healthy = jnp.logical_and(
@@ -417,8 +418,8 @@ class Humanoid_v5(BaseEnv):
         return is_healthy
 
     def _get_reward(
-        self, data: mjx.Data, x_velocity: jnp.ndarray, control: jnp.ndarray
-    ) -> jnp.ndarray:
+        self, data: mjx.Data, x_velocity: jax.Array, control: jax.Array
+    ) -> jax.Array:
         forward_reward = self._forward_reward_weight * x_velocity
         healthy_reward = self.healthy_reward(data)
         reward = forward_reward + healthy_reward
@@ -437,7 +438,7 @@ class Humanoid_v5(BaseEnv):
 
         return reward, reward_info
 
-    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, dict]:
+    def _step_wait(self) -> Tuple[jax.Array, jax.Array, jax.Array, dict]:
         data = self._states
         control = self._actions
 

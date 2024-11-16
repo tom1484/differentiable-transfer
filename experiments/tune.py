@@ -113,7 +113,7 @@ def main(
 
     def create_env(
         Env: Type[BaseEnv],
-        parameter: Optional[jnp.ndarray] = None,
+        parameter: Optional[jax.Array] = None,
         precompile: bool = False,
         eval_precompile: bool = False,
     ) -> Tuple[BaseEnv, BaseEnv]:
@@ -164,13 +164,13 @@ def main(
             self,
             sim_env: BaseEnv,
             preal_env: BaseEnv,
-            update_env: Callable[[jnp.ndarray], None],
-            parameter: jnp.ndarray,
-            parameter_range: jnp.ndarray,
-            parameter_mask: jnp.ndarray,
+            update_env: Callable[[jax.Array], None],
+            parameter: jax.Array,
+            parameter_range: jax.Array,
+            parameter_mask: jax.Array,
             loss_function: Callable[
-                [BaseDiffEnv, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray],
-                jnp.ndarray,
+                [BaseDiffEnv, jax.Array, jax.Array, jax.Array, jax.Array],
+                jax.Array,
             ],
             tune_config: TuneConfig,
             log_wandb: bool = True,
@@ -227,8 +227,8 @@ def main(
         def sample_rollouts_compute(
             self,
             transitions: List[Transition],
-            compute_function: Callable[[jnp.ndarray, jnp.ndarray, jnp.ndarray], Any],
-        ) -> jnp.ndarray:
+            compute_function: Callable[[jax.Array, jax.Array, jax.Array], Any],
+        ) -> jax.Array:
             batch_size = self.tune_config.batch_size
             num_batches = len(transitions) // batch_size
             transitions = transitions[: num_batches * batch_size]
@@ -246,7 +246,7 @@ def main(
 
             return value / num_batches
 
-        def compute_loss(self, parameter: jnp.ndarray):
+        def compute_loss(self, parameter: jax.Array):
             return self.sample_rollouts_compute(
                 self.transitions,
                 lambda states, next_states, actions: self.loss_function(
@@ -254,7 +254,7 @@ def main(
                 ),
             )
 
-        def compute_grad(self, parameter: jnp.ndarray):
+        def compute_grad(self, parameter: jax.Array):
             return self.sample_rollouts_compute(
                 self.transitions,
                 lambda states, next_states, actions: self.grad_function(
@@ -380,7 +380,7 @@ def main(
                 print("Loading model from", model_path)
                 model = model.load(model_path, env=sim_gym_env)
 
-            def update_env(parameter: jnp.ndarray):
+            def update_env(parameter: jax.Array):
                 sim_env.set_model_parameter(parameter)
                 sim_env.update_gym_env(sim_gym_env, parameter)
                 sim_eval_env.set_model_parameter(parameter)

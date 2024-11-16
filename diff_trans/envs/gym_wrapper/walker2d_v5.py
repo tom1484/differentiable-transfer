@@ -1,11 +1,11 @@
 from typing import Dict, Tuple, Union
 
-import numpy as np
-
 from gymnasium.spaces import Box
 
+import jax
 from jax import numpy as jnp
 from mujoco import mjx
+import numpy as np
 
 from .base import BaseEnv
 from ... import envs, sim
@@ -240,14 +240,14 @@ class Walker2d_v5(BaseEnv):
             "render_fps": int(np.round(1.0 / self.diff_env.dt)),
         }
 
-    def healthy_reward(self, data: mjx.Data) -> jnp.ndarray:
+    def healthy_reward(self, data: mjx.Data) -> jax.Array:
         return self.is_healthy(data) * self._healthy_reward
 
-    def control_cost(self, control: jnp.ndarray) -> jnp.ndarray:
+    def control_cost(self, control: jax.Array) -> jax.Array:
         control_cost = self._ctrl_cost_weight * jnp.sum(control**2, axis=1)
         return control_cost
 
-    def is_healthy(self, data: mjx.Data) -> jnp.ndarray:
+    def is_healthy(self, data: mjx.Data) -> jax.Array:
         qpos = data.qpos
         z, angle = qpos[:, 1], qpos[:, 2]
 
@@ -261,8 +261,8 @@ class Walker2d_v5(BaseEnv):
         return is_healthy
 
     def _get_reward(
-        self, data: mjx.Data, x_velocity: jnp.ndarray, control: jnp.ndarray
-    ) -> jnp.ndarray:
+        self, data: mjx.Data, x_velocity: jax.Array, control: jax.Array
+    ) -> jax.Array:
         forward_reward = self._forward_reward_weight * x_velocity
         healthy_reward = self.healthy_reward(data)
         rewards = forward_reward + healthy_reward
@@ -279,7 +279,7 @@ class Walker2d_v5(BaseEnv):
 
         return reward, reward_info
 
-    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, dict]:
+    def _step_wait(self) -> Tuple[jax.Array, jax.Array, jax.Array, dict]:
         data = self._states
         control = self._actions
 

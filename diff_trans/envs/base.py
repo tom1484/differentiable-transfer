@@ -105,19 +105,19 @@ class BaseDiffEnv:
 
         self.step_vj = step_vj.lower(self, self.model, data, control).compile()
 
-    def _get_body_com(self, data: mjx.Data, idx: int) -> jnp.ndarray:
+    def _get_body_com(self, data: mjx.Data, idx: int) -> jax.Array:
         """
         Get the center of mass of a body.
         """
         return data.subtree_com[idx]
 
-    def _get_body_com_batch(self, data: mjx.Data, idx: int) -> jnp.ndarray:
+    def _get_body_com_batch(self, data: mjx.Data, idx: int) -> jax.Array:
         """
         Get the center of mass of a body for a batch of environments.
         """
         return data.subtree_com[:, idx]
 
-    def _get_state_vector_batch(self, data: mjx.Data) -> jnp.ndarray:
+    def _get_state_vector_batch(self, data: mjx.Data) -> jax.Array:
         """
         Get the state vector of a batch of environments.
         """
@@ -188,22 +188,22 @@ class BaseDiffEnv:
     def reset(self, key: jnp.array) -> mjx.Data:
         NotImplementedError()
 
-    def _get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jax.Array:
         NotImplementedError()
 
-    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jax.Array) -> mjx.Model:
         NotImplementedError()
 
     def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> Env:
         NotImplementedError()
 
-    def _update_gym_env(self, gym_env: Env, parameter: jnp.ndarray):
+    def _update_gym_env(self, gym_env: Env, parameter: jax.Array):
         NotImplementedError()
 
-    def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+    def _state_to_data(self, data: mjx.Data, states: jax.Array) -> mjx.Data:
         NotImplementedError()
 
-    def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
+    def _control_to_data(self, data: mjx.Data, control: jax.Array) -> mjx.Data:
         NotImplementedError()
 
     def _get_obs(self, data: mjx.Data) -> np.ndarray:

@@ -24,9 +24,9 @@ def step_at(
     env: BaseDiffEnv,
     model: mjx.Model,
     data: mjx.Data,
-    state: jnp.ndarray,
-    control: jnp.ndarray,
-) -> Tuple[mjx.Data, jnp.ndarray]:
+    state: jax.Array,
+    control: jax.Array,
+) -> Tuple[mjx.Data, jax.Array]:
     data = env._state_to_data(data, state)
     data = env._control_to_data(data, control)
 
@@ -37,7 +37,7 @@ def step_at(
 
 
 def step(
-    env: BaseDiffEnv, model: mjx.Model, data: mjx.Data, control: jnp.ndarray
+    env: BaseDiffEnv, model: mjx.Model, data: mjx.Data, control: jax.Array
 ) -> mjx.Data:
     data = env._control_to_data(data, control)
 

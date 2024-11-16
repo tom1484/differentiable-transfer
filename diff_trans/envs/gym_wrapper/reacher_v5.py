@@ -2,6 +2,7 @@ from typing import Dict, Tuple, Union
 
 from gymnasium.spaces import Box
 
+import jax
 from jax import numpy as jnp
 import numpy as np
 from mujoco import mjx
@@ -194,7 +195,7 @@ class Reacher_v5(BaseEnv):
             "render_fps": int(np.round(1.0 / self.diff_env.dt)),
         }
 
-    def _get_reward(self, data: mjx.Data, control: jnp.ndarray) -> jnp.ndarray:
+    def _get_reward(self, data: mjx.Data, control: jax.Array) -> jax.Array:
         vec = self.diff_env._get_body_com_batch(
             data, 3
         ) - self.diff_env._get_body_com_batch(data, 4)
@@ -210,7 +211,7 @@ class Reacher_v5(BaseEnv):
 
         return reward, reward_info
 
-    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    def _step_wait(self) -> Tuple[jax.Array, jax.Array, jax.Array]:
         data = self._states
         control = self._actions
 

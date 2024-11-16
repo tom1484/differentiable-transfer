@@ -2,6 +2,7 @@ from typing import List, Tuple
 
 from tqdm import tqdm
 
+import jax
 from jax import numpy as jnp
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
@@ -10,11 +11,11 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from ..envs.gym_wrapper import BaseEnv
 
 
-Transition = Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
+Transition = Tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]
 Trajectory = List[Transition]
 
 
-def squeeze_array_envs(array: jnp.ndarray):
+def squeeze_array_envs(array: jax.Array):
     num_dims = len(array.shape)
     return jnp.transpose(array, (1, 0, *list(range(2, num_dims))))
 

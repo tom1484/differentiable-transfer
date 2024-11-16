@@ -2,6 +2,7 @@ from typing import Dict, Tuple, Union
 
 from gymnasium.spaces import Box
 
+import jax
 from jax import numpy as jnp
 import numpy as np
 
@@ -168,7 +169,7 @@ class InvertedPendulum_v5(BaseEnv):
             "render_fps": int(np.round(1.0 / self.diff_env.dt)),
         }
 
-    def _step_wait(self) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    def _step_wait(self) -> Tuple[jax.Array, jax.Array, jax.Array]:
         data = self._states
         control = self._actions
 

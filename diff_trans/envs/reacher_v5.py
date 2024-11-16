@@ -1,8 +1,9 @@
 from typing import Optional
 
-import numpy as np
+import jax
 from jax import numpy as jnp
 from jax import random
+import numpy as np
 
 from mujoco import mjx
 from gymnasium.envs.mujoco.mujoco_env import MujocoEnv
@@ -82,7 +83,7 @@ class DiffReacher_v5(BaseDiffEnv):
 
         return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def _get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jax.Array:
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
         friction_loss = self.model.dof_frictionloss.copy()
@@ -97,7 +98,7 @@ class DiffReacher_v5(BaseDiffEnv):
             ]
         )
 
-    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jax.Array) -> mjx.Model:
         armature = self.model.dof_armature
         armature = armature.at[0:2].set(parameter[0:2])
 
@@ -126,13 +127,13 @@ class DiffReacher_v5(BaseDiffEnv):
 
         return gym_env
 
-    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jnp.ndarray):
+    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jax.Array):
         model = gym_env.unwrapped.model
         model.dof_armature[:2] = parameter[:2]
         model.dof_damping[2:4] = parameter[2:4]
         model.body_mass[1:4] = parameter[4:7]
 
-    def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+    def _state_to_data(self, data: mjx.Data, states: jax.Array) -> mjx.Data:
         # TODO: Use parallelized version
         cos = states[:2]
         sin = states[2:4]
@@ -147,7 +148,7 @@ class DiffReacher_v5(BaseDiffEnv):
 
         return data.replace(qpos=qpos, qvel=qvel)
 
-    def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
+    def _control_to_data(self, data: mjx.Data, control: jax.Array) -> mjx.Data:
         return data.replace(ctrl=control)
 
     def _get_obs(self, data: mjx.Data) -> np.ndarray:

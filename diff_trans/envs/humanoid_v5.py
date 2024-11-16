@@ -1,8 +1,8 @@
 from typing import Optional
 
-import numpy as np
+import jax
 from jax import numpy as jnp
-from jax import random, lax
+import numpy as np
 
 from mujoco import mjx
 from gymnasium import Env
@@ -98,7 +98,7 @@ class DiffHumanoid_v5(BaseDiffEnv):
 
     #     return mjx.step(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    # def get_parameter(self) -> jnp.ndarray:
+    # def get_parameter(self) -> jax.Array:
     #     friction = self.model.geom_friction.copy()
     #     armature = self.model.dof_armature.copy()
     #     damping = self.model.dof_damping.copy()
@@ -113,7 +113,7 @@ class DiffHumanoid_v5(BaseDiffEnv):
     #         ]
     #     )
 
-    # def set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    # def set_parameter(self, parameter: jax.Array) -> mjx.Model:
     #     friction = self.model.geom_friction
     #     friction = friction.at[0, :1].set(parameter[:1])
 
@@ -133,7 +133,7 @@ class DiffHumanoid_v5(BaseDiffEnv):
     #         body_mass=mass,
     #     )
 
-    # def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+    # def _state_to_data(self, data: mjx.Data, states: jax.Array) -> mjx.Data:
     #     qpos = states[:15]
     #     qvel = states[15:29]
 
@@ -142,10 +142,10 @@ class DiffHumanoid_v5(BaseDiffEnv):
     def _create_gym_env(self, parameter: Optional[np.ndarray] = None) -> Env:
         raise NotImplementedError()
 
-    def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
+    def _control_to_data(self, data: mjx.Data, control: jax.Array) -> mjx.Data:
         return data.replace(ctrl=control)
 
-    # def contact_forces(self, data: mjx.Data) -> jnp.ndarray:
+    # def contact_forces(self, data: mjx.Data) -> jax.Array:
     #     raw_contact_forces = data.cfrc_ext.flatten()
     #     min_value, max_value = self._contact_force_range
     #     contact_forces = jnp.clip(raw_contact_forces, min_value, max_value)

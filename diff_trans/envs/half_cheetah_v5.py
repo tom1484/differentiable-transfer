@@ -1,9 +1,9 @@
 from typing import Optional
 
-import numpy as np
-
+import jax
 from jax import numpy as jnp
 from jax import random
+import numpy as np
 
 from mujoco import mjx
 from gymnasium.envs.mujoco.mujoco_env import MujocoEnv
@@ -82,7 +82,7 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
 
         return mjx.forward(self.model, self.data.replace(qpos=qpos, qvel=qvel))
 
-    def _get_parameter(self) -> jnp.ndarray:
+    def _get_parameter(self) -> jax.Array:
         friction = self.model.geom_friction.copy()
         armature = self.model.dof_armature.copy()
         damping = self.model.dof_damping.copy()
@@ -97,7 +97,7 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
             ]
         )
 
-    def _set_parameter(self, parameter: jnp.ndarray) -> mjx.Model:
+    def _set_parameter(self, parameter: jax.Array) -> mjx.Model:
         friction = self.model.geom_friction
         friction = friction.at[0, :1].set(parameter[:1])
 
@@ -127,14 +127,14 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
 
         return gym_env
 
-    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jnp.ndarray):
+    def _update_gym_env(self, gym_env: MujocoEnv, parameter: jax.Array):
         model = gym_env.unwrapped.model
         model.geom_friction[0, :1] = parameter[:1]
         model.dof_armature[sidx(3, 6)] = parameter[1:3]
         model.dof_damping[sidx(3, 6)] = parameter[3:5]
         model.body_mass[1:2] = parameter[5:6]
 
-    def _state_to_data(self, data: mjx.Data, states: jnp.ndarray) -> mjx.Data:
+    def _state_to_data(self, data: mjx.Data, states: jax.Array) -> mjx.Data:
         if self._exclude_current_positions_from_observation:
             states = jnp.concatenate([jnp.zeros(1), states])
 
@@ -143,7 +143,7 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
 
         return data.replace(qpos=qpos, qvel=qvel)
 
-    def _control_to_data(self, data: mjx.Data, control: jnp.ndarray) -> mjx.Data:
+    def _control_to_data(self, data: mjx.Data, control: jax.Array) -> mjx.Data:
         return data.replace(ctrl=control)
 
     def _get_obs(self, env_data: mjx.Data) -> np.ndarray:

@@ -135,7 +135,7 @@ def main(
 
     from diff_trans.envs.gym_wrapper import get_env, BaseEnv
     from diff_trans.utils.loss import single_transition_loss
-    from diff_trans.utils.rollout import rollout_transitions, evaluate_policy
+    from diff_trans.utils.rollout import rollout_trajectories, evaluate_policy
     from diff_trans.utils.callbacks import (
         StopTrainingOnRewardThreshold,
         EvalCallback,
@@ -155,7 +155,7 @@ def main(
 
     def create_env(
         Env: Type[BaseEnv],
-        parameter: Optional[jnp.ndarray] = None,
+        parameter: Optional[jax.Array] = None,
         precompile: bool = False,
         eval_precompile: bool = False,
     ) -> Tuple[BaseEnv, BaseEnv]:
@@ -317,7 +317,7 @@ def main(
 
                 print("Computing gradient")
                 rollouts.append(
-                    rollout_transitions(
+                    rollout_trajectories(
                         preal_env,
                         model,
                         num_transitions=config.tune.loss_rollout_length,
