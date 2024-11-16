@@ -99,8 +99,11 @@ def main(
     from stable_baselines3.common.callbacks import EventCallback
 
     from diff_trans.envs.gym_wrapper import get_env, BaseEnv
-    from diff_trans.utils.loss import single_transition_loss
-    from diff_trans.utils.rollout import rollout_transitions, Transition
+    from diff_trans.utils.loss import (
+        single_transition_loss,
+        extract_array_from_transitions,
+    )
+    from diff_trans.utils.rollout import rollout_trajectories, Transition
     from diff_trans.utils.callbacks import EvalCallback
 
     from constants import ALGORITHMS
@@ -165,7 +168,10 @@ def main(
             parameter: jnp.ndarray,
             parameter_range: jnp.ndarray,
             parameter_mask: jnp.ndarray,
-            loss_function: Callable[[BaseDiffEnv, jnp.ndarray, List], jnp.ndarray],
+            loss_function: Callable[
+                [BaseDiffEnv, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray],
+                jnp.ndarray,
+            ],
             tune_config: TuneConfig,
             log_wandb: bool = True,
             verbose: int = 1,
@@ -185,7 +191,9 @@ def main(
             self.optimizer_state = self.optimizer.init(self.masked_parameter)
 
             self.loss_function = loss_function
-            self.grad_function = jax.grad(self.loss_function, argnums=1)
+            self.grad_function = jax.jit(
+                jax.grad(self.loss_function, argnums=1), static_argnums=(0,)
+            )
 
             self.tune_config = tune_config
 
@@ -208,7 +216,7 @@ def main(
                     f"Collecting rollouts ({self.num_rollouts}/{self.tune_config.max_rollouts})"
                 )
 
-            trajectories = rollout_transitions(
+            trajectories = rollout_trajectories(
                 self.preal_env,
                 self.model,
                 num_transitions=self.tune_config.rollout_timesteps,
@@ -219,7 +227,7 @@ def main(
         def sample_rollouts_compute(
             self,
             transitions: List[Transition],
-            compute_function: Callable[[List[Transition]], Any],
+            compute_function: Callable[[jnp.ndarray, jnp.ndarray, jnp.ndarray], Any],
         ) -> jnp.ndarray:
             batch_size = self.tune_config.batch_size
             num_batches = len(transitions) // batch_size
@@ -230,29 +238,31 @@ def main(
                 start_index = i * batch_size
                 end_index = (i + 1) * batch_size
                 transitions = self.transitions[start_index:end_index]
+                states, next_states, actions = extract_array_from_transitions(
+                    transitions
+                )
 
-                value += compute_function(transitions)
+                value += compute_function(states, next_states, actions)
 
             return value / num_batches
 
         def compute_loss(self, parameter: jnp.ndarray):
             return self.sample_rollouts_compute(
                 self.transitions,
-                lambda transitions: self.loss_function(
-                    self.sim_env.diff_env, parameter, transitions
+                lambda states, next_states, actions: self.loss_function(
+                    self.sim_env.diff_env, parameter, states, next_states, actions
                 ),
             )
 
         def compute_grad(self, parameter: jnp.ndarray):
             return self.sample_rollouts_compute(
                 self.transitions,
-                lambda transitions: self.grad_function(
-                    self.sim_env.diff_env, parameter, transitions
+                lambda states, next_states, actions: self.grad_function(
+                    self.sim_env.diff_env, parameter, states, next_states, actions
                 ),
             )
 
         def tune(self):
-            print(len(self.transitions))
             if len(self.transitions) < self.tune_config.batch_size:
                 return
 

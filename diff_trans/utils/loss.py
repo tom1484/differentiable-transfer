@@ -1,38 +1,70 @@
+from typing import List, Tuple
+
 from jax import numpy as jnp
-from typing import List
 
 from diff_trans.envs import BaseDiffEnv
 from diff_trans import sim
-from diff_trans.utils.rollout import Transition
+from diff_trans.utils.rollout import Trajectory, Transition
+
+
+def extract_array_from_trajectories(
+    trajectories: List[Trajectory],
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    states = []
+    next_states = []
+    actions = []
+
+    for trajectory in trajectories:
+        for state, next_state, action, _, done in trajectory:
+            if not done:
+                states.append(state)
+                next_states.append(next_state)
+                actions.append(action)
+
+    states = jnp.array(states)
+    next_states = jnp.array(next_states)
+    actions = jnp.array(actions)
+
+    return states, next_states, actions
+
+
+def extract_array_from_transitions(
+    transitions: List[Transition],
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    states = []
+    next_states = []
+    actions = []
+
+    for state, next_state, action, _, done in transitions:
+        if not done:
+            states.append(state)
+            next_states.append(next_state)
+            actions.append(action)
+
+    states = jnp.array(states)
+    next_states = jnp.array(next_states)
+    actions = jnp.array(actions)
+
+    return states, next_states, actions
 
 
 def single_transition_loss(
-    env: BaseDiffEnv, parameter: jnp.ndarray, transitions: List[Transition]
+    env: BaseDiffEnv,
+    parameter: jnp.ndarray,
+    states: jnp.ndarray,
+    next_states: jnp.ndarray,
+    actions: jnp.ndarray,
 ):
     """
     Compute the loss for a single transition.
     This only works under full observability.
     """
-    observations = []
-    next_observations = []
-    actions = []
-
-    for observation, next_observation, action, _, done in transitions:
-        if not done:
-            observations.append(observation)
-            next_observations.append(next_observation)
-            actions.append(action)
-
-    observations = jnp.array(observations)
-    next_observations = jnp.array(next_observations)
-    actions = jnp.array(actions)
-
     model = env._set_parameter(parameter)
-    data = env._state_to_data_vj_(env.data, observations)
+    data = env._state_to_data_vj_(env.data, states)
     data = sim.step_vj(env, model, data, actions)
-    next_observations_sim = env._get_obs_vj_(data)
+    next_states_sim = env._get_obs_vj_(data)
 
-    diff = next_observations - next_observations_sim
+    diff = next_states - next_states_sim
     loss = jnp.mean(jnp.sum(diff**2, axis=1))
 
     return loss

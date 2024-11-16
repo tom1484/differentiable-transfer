@@ -19,7 +19,7 @@ def squeeze_array_envs(array: jnp.ndarray):
     return jnp.transpose(array, (1, 0, *list(range(2, num_dims))))
 
 
-def rollout_transitions(
+def rollout_trajectories(
     env: BaseEnv | SubprocVecEnv, model, num_transitions=100
 ) -> List[Trajectory]:
     num_envs = env.num_envs
