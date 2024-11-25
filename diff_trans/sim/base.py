@@ -1,10 +1,7 @@
 from typing import Tuple
-from functools import partial
 
 import jax
-from jax import numpy as jnp
 from jax import lax
-
 from mujoco import mjx
 
 from ..envs import BaseDiffEnv

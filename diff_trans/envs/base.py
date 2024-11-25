@@ -59,18 +59,24 @@ class BaseDiffEnv:
         self.frame_skip = frame_skip
         self.dt = frame_skip * mj_model.opt.timestep
 
-        # Initialize the JIT functions
+        # VMAP functions
+        self.reset_v = jax.vmap(self.reset)
+        self._get_obs_v = jax.vmap(self._get_obs)
+        self._state_to_data_v = jax.vmap(self._state_to_data, in_axes=(None, 0))
+        self._control_to_data_v = jax.vmap(self._control_to_data, in_axes=(None, 0))
+
+        # JIT functions
         self.reset_vj = jax.jit(jax.vmap(self.reset))
         self._get_obs_vj = jax.jit(jax.vmap(self._get_obs))
 
         # Uncompiled functions
-        self._get_obs_vj_ = jax.jit(jax.vmap(self._get_obs))
-        self._state_to_data_vj_ = jax.jit(
-            jax.vmap(self._state_to_data, in_axes=(None, 0))
-        )
-        self._control_to_data_vj_ = jax.jit(
-            jax.vmap(self._control_to_data, in_axes=(None, 0))
-        )
+        # self._get_obs_vj_ = jax.jit(jax.vmap(self._get_obs))
+        # self._state_to_data_vj_ = jax.jit(
+        #     jax.vmap(self._state_to_data, in_axes=(None, 0))
+        # )
+        # self._control_to_data_vj_ = jax.jit(
+        #     jax.vmap(self._control_to_data, in_axes=(None, 0))
+        # )
 
         # Prevent circular import
         from ..sim import step_vj

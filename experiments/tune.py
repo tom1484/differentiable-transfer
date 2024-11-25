@@ -11,7 +11,7 @@ app = typer.Typer(pretty_exceptions_show_locals=False)
 class TrainConfig:
     num_envs: int = 1
     max_timesteps: int = 100000
-    use_checkpoint: bool = False
+    checkpoint: Optional[str] = None
 
 
 @dataclass
@@ -27,6 +27,10 @@ class TuneConfig:
     max_rollouts: int = 10
     rollout_frequency: int = 5000
     rollout_timesteps: int = 500
+
+    skip_nan: bool = False
+    clip_gradient: float = 50
+    gradient_threshold: float = 100
 
 
 @dataclass
@@ -89,8 +93,9 @@ def main(
     from omegaconf import OmegaConf
 
     import os
-    import random
     import time
+    import pickle
+    import traceback
 
     import jax
     import jax.numpy as jnp
@@ -103,7 +108,7 @@ def main(
         single_transition_loss,
         extract_array_from_transitions,
     )
-    from diff_trans.utils.rollout import rollout_trajectories, Transition
+    from diff_trans.utils.rollout import rollout_trajectories
     from diff_trans.utils.callbacks import EvalCallback
 
     from constants import ALGORITHMS
@@ -159,11 +164,16 @@ def main(
     else:
         parameter_mask = jnp.arange(0, num_parameters, dtype=int)
 
+    loss_env = Env(
+        num_envs=config.tune.batch_size,
+        **default(config.env_config, {}),
+    )
+
     class TuneCallback(EventCallback):
         def __init__(
             self,
-            sim_env: BaseEnv,
-            preal_env: BaseEnv,
+            env: BaseEnv,
+            rollout_env: BaseEnv,
             update_env: Callable[[jax.Array], None],
             parameter: jax.Array,
             parameter_range: jax.Array,
@@ -172,14 +182,14 @@ def main(
                 [BaseDiffEnv, jax.Array, jax.Array, jax.Array, jax.Array],
                 jax.Array,
             ],
-            tune_config: TuneConfig,
+            config: TuneConfig,
             log_wandb: bool = True,
             verbose: int = 1,
         ):
             super().__init__(verbose=verbose)
 
-            self.sim_env = sim_env
-            self.preal_env = preal_env
+            self.env = env
+            self.rollout_env = rollout_env
             self.update_env = update_env
 
             self.parameter = parameter
@@ -187,26 +197,61 @@ def main(
             self.parameter_mask = parameter_mask
             self.masked_parameter = parameter[parameter_mask]
 
-            self.optimizer = optax.adam(tune_config.learning_rate)
+            self.optimizer = optax.adam(config.learning_rate)
             self.optimizer_state = self.optimizer.init(self.masked_parameter)
 
-            self.loss_function = loss_function
-            self.grad_function = jax.jit(
-                jax.grad(self.loss_function, argnums=1), static_argnums=(0,)
-            )
-
-            self.tune_config = tune_config
-
+            self.create_loss_function(loss_function, config.batch_size)
             self.num_gradient_steps = 0
             self.current_loss = float("inf")
 
+            self.tune_config = config
+
             self.num_rollouts = 0
-            self.transitions: List[Transition] = []
+            self.num_transitions = 0
+            self.transitions = (jnp.empty((0,)), jnp.empty((0,)), jnp.empty((0,)))
 
             self.log_wandb = log_wandb
             self.verbose = verbose
 
             self.noise_scale = 0.001
+
+        def create_loss_function(
+            self,
+            loss_function: Callable[
+                [BaseDiffEnv, jax.Array, jax.Array, jax.Array, jax.Array],
+                jax.Array,
+            ],
+            batch_size: int,
+        ):
+            parameter = self.parameter.copy()
+            state_dim = self.env.diff_env.state_dim
+            control_dim = self.env.diff_env.control_dim
+
+            states = jnp.zeros((batch_size, state_dim))
+            next_states = jnp.zeros((batch_size, state_dim))
+            actions = jnp.zeros((batch_size, control_dim))
+
+            loss_function_jit = jax.jit(loss_function, static_argnums=(0,))
+            grad_function_jit = jax.jit(
+                jax.grad(loss_function, argnums=1), static_argnums=(0,)
+            )
+
+            print("Compiling loss function... ", end="")
+            self.loss_function = loss_function_jit.lower(
+                self.env.diff_env, parameter, states, next_states, actions
+            ).compile()
+            self.grad_function = grad_function_jit.lower(
+                self.env.diff_env, parameter, states, next_states, actions
+            ).compile()
+            print("Done")
+
+            # self.loss_function = loss_function
+            # self.grad_function = jax.grad(loss_function, argnums=1)
+
+            # self.loss_function = jax.jit(loss_function, static_argnums=(0,))
+            # self.grad_function = jax.jit(
+            #     jax.grad(loss_function, argnums=1), static_argnums=(0,)
+            # )
 
         def rollout(self):
             self.num_rollouts += 1
@@ -217,59 +262,129 @@ def main(
                 )
 
             trajectories = rollout_trajectories(
-                self.preal_env,
+                self.rollout_env,
                 self.model,
                 num_transitions=self.tune_config.rollout_timesteps,
             )
+            transitions = []
             for trajectory in trajectories:
-                self.transitions.extend(trajectory)
+                transitions.extend(trajectory)
 
-        def sample_rollouts_compute(
+            states, next_states, actions = extract_array_from_transitions(transitions)
+
+            if self.num_transitions == 0:
+                self.transitions = (states, next_states, actions)
+                self.num_transitions = len(states)
+            else:
+                self.transitions = (
+                    jnp.concatenate([self.transitions[0], states]),
+                    jnp.concatenate([self.transitions[1], next_states]),
+                    jnp.concatenate([self.transitions[2], actions]),
+                )
+                self.num_transitions += len(states)
+
+            if self.log_wandb:
+                wandb.log(
+                    dict(
+                        timesteps=self.num_timesteps,
+                        num_rollouts=self.num_rollouts,
+                        num_transitions=self.num_transitions,
+                    )
+                )
+
+        def shuffle_transitions(self):
+            states, next_states, actions = self.transitions
+            key = jax.random.PRNGKey(time.time_ns())
+            self.transitions = (
+                jax.random.permutation(key, states, axis=0, independent=True),
+                jax.random.permutation(key, next_states, axis=0, independent=True),
+                jax.random.permutation(key, actions, axis=0, independent=True),
+            )
+
+        def sample_transitions_compute(
             self,
-            transitions: List[Transition],
-            compute_function: Callable[[jax.Array, jax.Array, jax.Array], Any],
+            compute_function: Callable[[jax.Array, jax.Array, jax.Array], jax.Array],
+            default_value: Optional[jax.Array] = None,
+            # clip_value: Optional[jax.Array] = None,
+            # ignore_threshold: Optional[jax.Array] = None,
+            clip_value: Optional[float] = None,
+            ignore_threshold: Optional[float] = None,
         ) -> jax.Array:
             batch_size = self.tune_config.batch_size
-            num_batches = len(transitions) // batch_size
-            transitions = transitions[: num_batches * batch_size]
+            num_batches = self.num_transitions // batch_size
 
-            value = 0
+            value_acc = 0
+            success = 0
             for i in range(num_batches):
                 start_index = i * batch_size
                 end_index = (i + 1) * batch_size
-                transitions = self.transitions[start_index:end_index]
-                states, next_states, actions = extract_array_from_transitions(
-                    transitions
-                )
 
-                value += compute_function(states, next_states, actions)
+                states = self.transitions[0][start_index:end_index]
+                next_states = self.transitions[1][start_index:end_index]
+                actions = self.transitions[2][start_index:end_index]
 
-            return value / num_batches
+                value = compute_function(states, next_states, actions)
+                if jnp.isnan(value).any():
+                    if self.tune_config.skip_nan:
+                        continue
+                    else:
+                        traceback.print_stack()
+                        raise ValueError("Encountered NaN")
+
+                if ignore_threshold is not None and jnp.any(
+                    jnp.abs(value) > ignore_threshold
+                ):
+                    continue
+
+                if clip_value is not None:
+                    value = jnp.clip(value, -clip_value, clip_value)
+
+                value_acc += value
+                success += 1
+
+            if success == 0:
+                if default_value is None:
+                    traceback.print_stack()
+                    raise ValueError("No valid transitions found")
+                else:
+                    return default_value
+
+            return value_acc / success
 
         def compute_loss(self, parameter: jax.Array):
-            return self.sample_rollouts_compute(
-                self.transitions,
+            return self.sample_transitions_compute(
                 lambda states, next_states, actions: self.loss_function(
-                    self.sim_env.diff_env, parameter, states, next_states, actions
+                    parameter,
+                    states,
+                    next_states,
+                    actions,
+                    # self.env.diff_env, parameter, states, next_states, actions
                 ),
+                default_value=jnp.zeros(1),
             )
 
         def compute_grad(self, parameter: jax.Array):
-            return self.sample_rollouts_compute(
-                self.transitions,
+            return self.sample_transitions_compute(
                 lambda states, next_states, actions: self.grad_function(
-                    self.sim_env.diff_env, parameter, states, next_states, actions
+                    parameter,
+                    states,
+                    next_states,
+                    actions,
+                    # self.env.diff_env, parameter, states, next_states, actions
                 ),
+                default_value=jnp.zeros(parameter.shape),
+                clip_value=config.tune.clip_gradient,
+                ignore_threshold=config.tune.gradient_threshold,
             )
 
         def tune(self):
-            if len(self.transitions) < self.tune_config.batch_size:
+            if self.num_transitions < self.tune_config.batch_size:
                 return
 
             print(f"Tuning parameter...")
             for _ in range(self.tune_config.gradient_steps):
                 self.num_gradient_steps += 1
-                random.shuffle(self.transitions)
+                self.shuffle_transitions()
 
                 grad = self.compute_grad(self.parameter)
                 masked_grad = grad[self.parameter_mask]
@@ -285,8 +400,30 @@ def main(
 
                 loss = self.compute_loss(parameter)
 
+                if self.verbose >= 1:
+                    print(f"  Steps: {self.num_gradient_steps}")
+                    print(f"    Loss: {loss:.6f}")
+                if self.verbose >= 2:
+                    print(f"    Grad: {grad.tolist()}")
+                    print(f"    Parameter: {parameter.tolist()}")
+
                 if jnp.isnan(loss) or jnp.isnan(grad).any():
                     print("Loss or grad is NaN, skipping update")
+
+                    # Save parameter and rollouts to file
+                    filename = "nan-param-rollouts.pkl"
+                    if not os.path.exists(os.path.join(models_dir, filename)):
+                        with open(os.path.join(models_dir, filename), "wb") as f:
+                            pickle.dump(
+                                dict(
+                                    # env=self.env,
+                                    parameter=self.parameter,
+                                    transitions=self.transitions,
+                                ),
+                                f,
+                            )
+
+                    breakpoint()
 
                     key = jax.random.PRNGKey(time.time_ns())
                     noise = jax.random.normal(key=key, shape=masked_parameter.shape)
@@ -300,18 +437,39 @@ def main(
 
                     continue
 
+                if jnp.any(jnp.abs(grad) > 100.0):
+                    # Save parameter and rollouts to file
+                    filename = "large-grad-param-rollouts.pkl"
+                    if not os.path.exists(os.path.join(models_dir, filename)):
+                        with open(os.path.join(models_dir, filename), "wb") as f:
+                            pickle.dump(
+                                dict(
+                                    # env=self.env,
+                                    parameter=self.parameter,
+                                    transitions=self.transitions,
+                                ),
+                                f,
+                            )
+
+                    grad = grad.at[:].set(0.0)
+
+                filename = f"loss-{loss:.6f}-param-rollouts.pkl"
+                if not os.path.exists(os.path.join(models_dir, filename)):
+                    with open(os.path.join(models_dir, filename), "wb") as f:
+                        pickle.dump(
+                            dict(
+                                # env=self.env,
+                                parameter=self.parameter,
+                                transitions=self.transitions,
+                            ),
+                            f,
+                        )
+
                 self.current_loss = loss.tolist()
                 self.update_env(parameter)
 
                 self.parameter = parameter
                 self.masked_parameter = masked_parameter
-
-                if self.verbose >= 1:
-                    print(f"  Steps: {self.num_gradient_steps}")
-                    print(f"    Loss: {self.current_loss:.6f}")
-                if self.verbose >= 2:
-                    print(f"    Grad: {grad.tolist()}")
-                    print(f"    Parameter: {self.parameter.tolist()}")
 
                 if self.log_wandb:
                     wandb.log(
@@ -325,11 +483,13 @@ def main(
             if (
                 self.n_calls < self.tune_config.start_rollout_at
                 or self.current_loss < self.tune_config.stop_tuning_below
-                or self.num_rollouts >= self.tune_config.max_rollouts
             ):
                 return True
 
-            if self.n_calls % self.tune_config.rollout_frequency == 0:
+            if (
+                self.n_calls % self.tune_config.rollout_frequency == 0
+                and self.num_rollouts < self.tune_config.max_rollouts
+            ):
                 self.rollout()
 
             if self.n_calls % self.tune_config.tune_frequency == 0:
@@ -364,36 +524,20 @@ def main(
             print(f"Experiment {exp_id}")
             print()
 
-            model_name = f"{config.algorithm}-{config.env_name}-{exp_id:02d}"
-            model_path = os.path.join(models_dir, f"{model_name}.zip")
-
-            sim_gym_env = sim_env.create_gym_env(**default(config.env_config, {}))
-            model = Algorithm(
-                "MlpPolicy",
-                sim_gym_env,
-                verbose=0,
-                **default(config.algorithm_config, {}),
-            )
-
-            print("Model path:", model_path)
-            if config.train.use_checkpoint and os.path.exists(model_path):
-                print("Loading model from", model_path)
-                model = model.load(model_path, env=sim_gym_env)
-
             def update_env(parameter: jax.Array):
                 sim_env.set_model_parameter(parameter)
                 sim_env.update_gym_env(sim_gym_env, parameter)
                 sim_eval_env.set_model_parameter(parameter)
 
             tune_callback = TuneCallback(
-                sim_env,
-                preal_env,
-                update_env,
-                default_parameter.copy(),
-                sim_env.diff_env.parameter_range,
-                parameter_mask,
-                single_transition_loss,
-                config.tune,
+                env=loss_env,
+                rollout_env=preal_env,
+                update_env=update_env,
+                parameter=default_parameter.copy(),
+                parameter_range=sim_env.diff_env.parameter_range,
+                parameter_mask=parameter_mask,
+                loss_function=single_transition_loss,
+                config=config.tune,
                 log_wandb=config.log_wandb,
                 verbose=config.verbose,
             )
@@ -417,6 +561,24 @@ def main(
                 eval_freq=config.eval.frequency // config.train.num_envs,
                 verbose=config.verbose,
             )
+
+            model_name = f"{config.algorithm}-{config.env_name}-{exp_id:02d}"
+            model_path = os.path.join(models_dir, f"{model_name}.zip")
+
+            sim_gym_env = sim_env.create_gym_env(**default(config.env_config, {}))
+            model = Algorithm(
+                "MlpPolicy",
+                sim_gym_env,
+                verbose=0,
+                **default(config.algorithm_config, {}),
+            )
+
+            if config.train.checkpoint is not None:
+                print("Loading model from", config.train.checkpoint)
+                model = model.load(config.train.checkpoint, env=sim_gym_env)
+            else:
+                print("No checkpoint provided, training from scratch")
+                print("Model path:", model_path)
 
             model.learn(
                 total_timesteps=config.train.max_timesteps,

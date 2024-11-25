@@ -61,11 +61,11 @@ def single_transition_loss(
     This only works under full observability.
     """
     model = env._set_parameter(parameter)
-    data = env._state_to_data_vj_(env.data, states)
-    data = sim.step_vj(env, model, data, actions)
-    next_states_sim = env._get_obs_vj_(data)
+    data = env._state_to_data_v(env.data, states)
+    data = sim.step_v(env, model, data, actions)
+    next_states_sim = env._get_obs_v(data)
 
-    diff = next_states - next_states_sim
-    loss = jnp.mean(jnp.sum(diff**2, axis=1))
+    diff: jax.Array = next_states - next_states_sim
+    loss = jnp.mean(jnp.sum(jnp.abs(diff), axis=-1))
 
     return loss
