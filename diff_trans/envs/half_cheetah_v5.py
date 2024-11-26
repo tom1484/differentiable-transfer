@@ -10,7 +10,6 @@ from gymnasium.envs.mujoco.mujoco_env import MujocoEnv
 from gymnasium import make
 
 from .base import BaseDiffEnv
-from .utils.array import sidx
 
 
 class DiffHalfCheetah_v5(BaseDiffEnv):
@@ -21,10 +20,24 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
     |-----|-------------------------------------------|-----------|-------|-------|-------|
     | 0   | slide friction of the floor               | 0.4       | 0.001 | None  | slide |
     | 1   | armature inertia of the back thigh rotor  | 0.1       | 0.001 | None  | hinge |
-    | 2   | armature inertia of the front thigh rotor | 0.1       | 0.001 | None  | hinge |
-    | 3   | damping of the back thigh rotor           | 6.0       | 0.001 | None  | hinge |
-    | 4   | damping of the front thigh rotor          | 4.5       | 0.001 | None  | hinge |
-    | 5   | mass of the torso                         | 6.2502093 | 0.001 | None  |       |
+    | 2   | armature inertia of the back shin rotor   | 0.1       | 0.001 | None  | hinge |
+    | 3   | armature inertia of the back foot rotor   | 0.1       | 0.001 | None  | hinge |
+    | 4   | armature inertia of the front thigh rotor | 0.1       | 0.001 | None  | hinge |
+    | 5   | armature inertia of the front shin rotor  | 0.1       | 0.001 | None  | hinge |
+    | 6   | armature inertia of the front foot rotor  | 0.1       | 0.001 | None  | hinge |
+    | 7   | damping of the back thigh rotor           | 6.0       | 0.001 | None  | hinge |
+    | 8   | damping of the back shin rotor            | 4.5       | 0.001 | None  | hinge |
+    | 9   | damping of the back foot rotor            | 3.0       | 0.001 | None  | hinge |
+    | 10  | damping of the front thigh rotor          | 4.5       | 0.001 | None  | hinge |
+    | 11  | damping of the front shin rotor           | 3.0       | 0.001 | None  | hinge |
+    | 12  | damping of the front foot rotor           | 1.5       | 0.001 | None  | hinge |
+    | 13  | mass of the torso                         | 6.2502093 | 0.001 | None  |       |
+    | 14  | mass of the back thigh                    | 1.5435146 | 0.001 | None  |       |
+    | 15  | mass of the back shin                     | 1.5874476 | 0.001 | None  |       |
+    | 16  | mass of the back foot                     | 1.0953975 | 0.001 | None  |       |
+    | 17  | mass of the front thigh                   | 1.4380753 | 0.001 | None  |       |
+    | 18  | mass of the front shin                    | 1.2008368 | 0.001 | None  |       |
+    | 19  | mass of the front foot                    | 0.8845188 | 0.001 | None  |       |
     """
 
     def __init__(
@@ -54,15 +67,15 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
             [
                 [
                     0.001,  # friction
-                    0.001, 0.001,  # armature
-                    0.001, 0.001,  # damping
-                    0.001,  # mass
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # armature
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # damping
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # mass
                 ],
                 [
                     jnp.inf,  # friction
-                    jnp.inf, jnp.inf,  # armature
-                    jnp.inf, jnp.inf,  # damping
-                    jnp.inf,  # mass
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # damping
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # mass
                 ],
             ]
         )
@@ -91,9 +104,9 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         return jnp.concatenate(
             [
                 friction[0, 0:1],
-                armature[sidx(3, 6)],
-                damping[sidx(3, 6)],
-                mass[1:2],
+                armature[3:9],
+                damping[3:9],
+                mass[1:8],
             ]
         )
 
@@ -102,13 +115,13 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
         friction = friction.at[0, :1].set(parameter[:1])
 
         armature = self.model.dof_armature
-        armature = armature.at[sidx(3, 6)].set(parameter[1:3])
+        armature = armature.at[3:9].set(parameter[1:7])
 
         damping = self.model.dof_damping
-        damping = damping.at[sidx(3, 6)].set(parameter[3:5])
+        damping = damping.at[3:9].set(parameter[7:13])
 
         mass = self.model.body_mass
-        mass = mass.at[1:2].set(parameter[5:6])
+        mass = mass.at[1:8].set(parameter[13:20])
 
         return self.model.replace(
             geom_friction=friction,
@@ -130,9 +143,9 @@ class DiffHalfCheetah_v5(BaseDiffEnv):
     def _update_gym_env(self, gym_env: MujocoEnv, parameter: jax.Array):
         model = gym_env.unwrapped.model
         model.geom_friction[0, :1] = parameter[:1]
-        model.dof_armature[sidx(3, 6)] = parameter[1:3]
-        model.dof_damping[sidx(3, 6)] = parameter[3:5]
-        model.body_mass[1:2] = parameter[5:6]
+        model.dof_armature[3:9] = parameter[1:7]
+        model.dof_damping[3:9] = parameter[7:13]
+        model.body_mass[1:8] = parameter[13:20]
 
     def _state_to_data(self, data: mjx.Data, states: jax.Array) -> mjx.Data:
         if self._exclude_current_positions_from_observation:

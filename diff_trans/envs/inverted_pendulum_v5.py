@@ -16,15 +16,15 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
     ## Parameter Space
 
     | Num | Parameter                         | Default   | Min | Max  | Joint |
-    |-----|-----------------------------------|-----------|-----|------|-------|
-    | 0   | friction loss of the slider       |  0.0      | 0.0 |  0.5 | slide |
-    | 1   | friction loss of the pole rotor   |  0.0      | 0.0 |  0.5 | hinge |
-    | 2   | armature mass of the cart         |  0.0      | 0.0 |  0.5 | slide |
-    | 3   | armature inertia of the pole      |  0.0      | 0.0 |  0.5 | hinge |
-    | 4   | damping of the slider             |  1.0      | 0.5 |  1.5 | slide |
-    | 5   | damping of the pole rotor         |  1.0      | 0.5 |  1.5 | hinge |
-    | 6   | mass of the cart                  | 10.471975 | 5.0 | 15.0 |       |
-    | 7   | mass of the joint                 |  5.018591 | 2.5 |  7.5 |       |
+    |-----|-----------------------------------|-----------|-------|------|-------|
+    | 0   | friction loss of the slider       |  0.0      | 0.001 | None | slide |
+    | 1   | friction loss of the pole rotor   |  0.0      | 0.001 | None | hinge |
+    | 2   | armature mass of the cart         |  0.0      | 0.001 | None | slide |
+    | 3   | armature inertia of the pole      |  0.0      | 0.001 | None | hinge |
+    | 4   | damping of the slider             |  1.0      | 0.001 | None | slide |
+    | 5   | damping of the pole rotor         |  1.0      | 0.001 | None | hinge |
+    | 6   | mass of the cart                  | 10.471975 | 0.001 | None |       |
+    | 7   | mass of the joint                 |  5.018591 | 0.001 | None |       |
     """
 
     def __init__(
@@ -42,16 +42,16 @@ class DiffInvertedPendulum_v5(BaseDiffEnv):
         self.parameter_range = jnp.array(
             [
                 [
-                    0.0, 0.0,  # friction loss
-                    0.5, 0.5,  # armature
-                    0.5, 0.5,  # damping
-                    5.0, 2.5,  # mass
+                    0.001, 0.001,  # friction loss
+                    0.001, 0.001,  # armature
+                    0.001, 0.001,  # damping
+                    0.001, 0.001,  # mass
                 ],
                 [
-                    0.5, 0.5,  # friction loss
-                    1.5, 1.5,  # armature
-                    1.5, 1.5,  # damping
-                    15.0, 7.5,  # mass
+                    jnp.inf, jnp.inf,  # friction loss
+                    jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf,  # damping
+                    jnp.inf, jnp.inf,  # mass
                 ],
             ]
         )

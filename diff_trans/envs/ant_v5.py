@@ -16,26 +16,26 @@ class DiffAnt_v5(BaseDiffEnv):
     """
     ## Parameter Space
 
-    | Num | Parameter                      | Default   | Min  | Max  | Joint |
-    |-----|--------------------------------|-----------|------|------|-------|
-    | 0   | slide friction of the floor    | 1.0       | 0.5  | 1.5  | slide |
-    | 1   | armature inertia of the hip1   | 1.0       | 0.5  | 1.5  | hinge |
-    | 2   | armature inertia of the ankle1 | 1.0       | 0.5  | 1.5  | hinge |
-    | 3   | armature inertia of the hip2   | 1.0       | 0.5  | 1.5  | hinge |
-    | 4   | armature inertia of the ankle2 | 1.0       | 0.5  | 1.5  | hinge |
-    | 5   | armature inertia of the hip3   | 1.0       | 0.5  | 1.5  | hinge |
-    | 6   | armature inertia of the ankle3 | 1.0       | 0.5  | 1.5  | hinge |
-    | 7   | armature inertia of the hip4   | 1.0       | 0.5  | 1.5  | hinge |
-    | 8   | armature inertia of the ankle4 | 1.0       | 0.5  | 1.5  | hinge |
-    | 9   | damping of the hip1            | 1.0       | 0.5  | 1.5  | hinge |
-    | 10  | damping of the ankle1          | 1.0       | 0.5  | 1.5  | hinge |
-    | 11  | damping of the hip2            | 1.0       | 0.5  | 1.5  | hinge |
-    | 12  | damping of the ankle2          | 1.0       | 0.5  | 1.5  | hinge |
-    | 13  | damping of the hip3            | 1.0       | 0.5  | 1.5  | hinge |
-    | 14  | damping of the ankle3          | 1.0       | 0.5  | 1.5  | hinge |
-    | 15  | damping of the hip4            | 1.0       | 0.5  | 1.5  | hinge |
-    | 16  | damping of the ankle4          | 1.0       | 0.5  | 1.5  | hinge |
-    | 17  | mass of the torso              | 0.3272492 | 0.16 | 0.48 |       |
+    | Num | Parameter                      | Default   | Min   | Max  | Joint |
+    |-----|--------------------------------|-----------|-------|------|-------|
+    | 0   | slide friction of the floor    | 1.0       | 0.001 | None | slide |
+    | 1   | armature inertia of the hip1   | 1.0       | 0.001 | None | hinge |
+    | 2   | armature inertia of the ankle1 | 1.0       | 0.001 | None | hinge |
+    | 3   | armature inertia of the hip2   | 1.0       | 0.001 | None | hinge |
+    | 4   | armature inertia of the ankle2 | 1.0       | 0.001 | None | hinge |
+    | 5   | armature inertia of the hip3   | 1.0       | 0.001 | None | hinge |
+    | 6   | armature inertia of the ankle3 | 1.0       | 0.001 | None | hinge |
+    | 7   | armature inertia of the hip4   | 1.0       | 0.001 | None | hinge |
+    | 8   | armature inertia of the ankle4 | 1.0       | 0.001 | None | hinge |
+    | 9   | damping of the hip1            | 1.0       | 0.001 | None | hinge |
+    | 10  | damping of the ankle1          | 1.0       | 0.001 | None | hinge |
+    | 11  | damping of the hip2            | 1.0       | 0.001 | None | hinge |
+    | 12  | damping of the ankle2          | 1.0       | 0.001 | None | hinge |
+    | 13  | damping of the hip3            | 1.0       | 0.001 | None | hinge |
+    | 14  | damping of the ankle3          | 1.0       | 0.001 | None | hinge |
+    | 15  | damping of the hip4            | 1.0       | 0.001 | None | hinge |
+    | 16  | damping of the ankle4          | 1.0       | 0.001 | None | hinge |
+    | 17  | mass of the torso              | 0.3272492 | 0.001 | None |       |
     """
 
     def __init__(
@@ -66,16 +66,16 @@ class DiffAnt_v5(BaseDiffEnv):
         self.parameter_range = jnp.array(
             [
                 [
-                    0.5,  # friction
-                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # armature
-                    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,  # damping
-                    0.16,  # mass
+                    0.001,  # friction
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # armature
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # damping
+                    0.001,  # mass
                 ],
                 [
-                    1.5,  # friction
-                    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,  # armature
-                    1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,  # damping
-                    0.48,  # mass
+                    jnp.inf,  # friction
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # armature
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # damping
+                    jnp.inf,  # mass
                 ],
             ]
         )
@@ -129,7 +129,9 @@ class DiffAnt_v5(BaseDiffEnv):
             body_mass=mass,
         )
 
-    def _create_gym_env(self, parameter: Optional[np.ndarray] = None, **kwargs) -> MujocoEnv:
+    def _create_gym_env(
+        self, parameter: Optional[np.ndarray] = None, **kwargs
+    ) -> MujocoEnv:
         gym_env = make("Ant-v5", **kwargs)
 
         if parameter is not None:

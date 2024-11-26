@@ -32,6 +32,12 @@ class DiffWalker2d_v5(BaseDiffEnv):
     | 11  | damping of the left leg             | 0.1       | 0.001 | None | hinge |
     | 12  | damping of the left foot            | 0.1       | 0.001 | None | hinge |
     | 13  | mass of the torso                   | 3.6651914 | 0.001 | None |       |
+    | 14  | mass of the right thigh             | 4.0578904 | 0.001 | None |       |
+    | 15  | mass of the right leg               | 2.7813568 | 0.001 | None |       |
+    | 16  | mass of the right foot              | 3.1667254 | 0.001 | None |       |
+    | 17  | mass of the left thigh              | 4.0578904 | 0.001 | None |       |
+    | 18  | mass of the left leg                | 2.7813568 | 0.001 | None |       |
+    | 19  | mass of the left foot               | 3.1667254 | 0.001 | None |       |
     """
 
     def __init__(
@@ -63,13 +69,13 @@ class DiffWalker2d_v5(BaseDiffEnv):
                     0.001,  # friction
                     0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # armature
                     0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # damping
-                    0.001,  # mass
+                    0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,  # mass
                 ],
                 [
                     jnp.inf,  # friction
                     jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # armature
                     jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # damping
-                    jnp.inf,  # mass
+                    jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf, jnp.inf,  # mass
                 ],
             ]
         )
