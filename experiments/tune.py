@@ -295,10 +295,11 @@ def main(
         def shuffle_transitions(self):
             states, next_states, actions = self.transitions
             key = jax.random.PRNGKey(time.time_ns())
+            indexes = jax.random.permutation(key, jnp.arange(states.shape[0]))
             self.transitions = (
-                jax.random.permutation(key, states, axis=0, independent=True),
-                jax.random.permutation(key, next_states, axis=0, independent=True),
-                jax.random.permutation(key, actions, axis=0, independent=True),
+                states[indexes],
+                next_states[indexes],
+                actions[indexes],
             )
 
         def sample_transitions_compute(
