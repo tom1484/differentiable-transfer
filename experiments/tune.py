@@ -183,7 +183,9 @@ def main(
                 jax.Array,
             ],
             config: TuneConfig,
-            log_wandb: bool = True,
+            sim_eval_callback: EvalCallback,
+            preal_eval_callback: EvalCallback,
+            callback_on_log: Optional[Callable[[Dict[str, Any]], None]] = None,
             verbose: int = 1,
         ):
             super().__init__(verbose=verbose)
@@ -210,10 +212,23 @@ def main(
             self.num_transitions = 0
             self.transitions = (jnp.empty((0,)), jnp.empty((0,)), jnp.empty((0,)))
 
-            self.log_wandb = log_wandb
+            self.callback_on_log = callback_on_log
             self.verbose = verbose
 
             self.noise_scale = 0.001
+
+            self.sim_eval_callback = sim_eval_callback
+            self.preal_eval_callback = preal_eval_callback
+
+            # Log once for zero rollouts
+            # if self.callback_on_log is not None:
+            #     self.callback_on_log(
+            #         dict(
+            #             timesteps=0,
+            #             num_rollouts=0,
+            #             num_transitions=0,
+            #         )
+            #     )
 
         def create_loss_function(
             self,
@@ -253,9 +268,25 @@ def main(
             #     jax.grad(loss_function, argnums=1), static_argnums=(0,)
             # )
 
-        def rollout(self):
-            self.num_rollouts += 1
+        def rollout_log(self):
+            if self.callback_on_log is not None:
+                sim_mean_return = self.sim_eval_callback.last_mean_reward
+                preal_mean_return = self.preal_eval_callback.last_mean_reward
+                self.callback_on_log(
+                    dict(
+                        timesteps=self.num_timesteps,
+                        num_rollouts=self.num_rollouts,
+                        num_transitions=self.num_transitions,
+                        sim_return=sim_mean_return,
+                        preal_return=preal_mean_return,
+                    )
+                )
 
+        def rollout(self):
+            # Log the final performance of the previous rollouts
+            self.rollout_log()
+
+            self.num_rollouts += 1
             if self.verbose >= 1:
                 print(
                     f"Collecting rollouts ({self.num_rollouts}/{self.tune_config.max_rollouts})"
@@ -283,14 +314,14 @@ def main(
                 )
                 self.num_transitions += len(states)
 
-            if self.log_wandb:
-                wandb.log(
-                    dict(
-                        timesteps=self.num_timesteps,
-                        num_rollouts=self.num_rollouts,
-                        num_transitions=self.num_transitions,
-                    )
-                )
+            # if self.callback_on_log is not None:
+            #     self.callback_on_log(
+            #         dict(
+            #             timesteps=self.num_timesteps,
+            #             num_rollouts=self.num_rollouts,
+            #             num_transitions=self.num_transitions,
+            #         )
+            #     )
 
         def shuffle_transitions(self):
             states, next_states, actions = self.transitions
@@ -378,6 +409,16 @@ def main(
                 ignore_threshold=config.tune.gradient_threshold,
             )
 
+        def tune_log(self): 
+            if self.callback_on_log is not None:
+                self.callback_on_log(
+                    dict(
+                        timesteps=self.num_timesteps,
+                        gradient_steps=self.num_gradient_steps,
+                        loss=self.current_loss,
+                    )
+                )
+
         def tune(self):
             if self.num_transitions < self.tune_config.batch_size:
                 return
@@ -438,21 +479,21 @@ def main(
 
                     continue
 
-                if jnp.any(jnp.abs(grad) > 100.0):
-                    # Save parameter and rollouts to file
-                    filename = "large-grad-param-rollouts.pkl"
-                    if not os.path.exists(os.path.join(models_dir, filename)):
-                        with open(os.path.join(models_dir, filename), "wb") as f:
-                            pickle.dump(
-                                dict(
-                                    # env=self.env,
-                                    parameter=self.parameter,
-                                    transitions=self.transitions,
-                                ),
-                                f,
-                            )
+                # if jnp.any(jnp.abs(grad) > 100.0):
+                #     # Save parameter and rollouts to file
+                #     filename = "large-grad-param-rollouts.pkl"
+                #     if not os.path.exists(os.path.join(models_dir, filename)):
+                #         with open(os.path.join(models_dir, filename), "wb") as f:
+                #             pickle.dump(
+                #                 dict(
+                #                     # env=self.env,
+                #                     parameter=self.parameter,
+                #                     transitions=self.transitions,
+                #                 ),
+                #                 f,
+                #             )
 
-                    grad = grad.at[:].set(0.0)
+                #     grad = grad.at[:].set(0.0)
 
                 filename = f"loss-{loss:.6f}-param-rollouts.pkl"
                 if not os.path.exists(os.path.join(models_dir, filename)):
@@ -472,13 +513,7 @@ def main(
                 self.parameter = parameter
                 self.masked_parameter = masked_parameter
 
-                if self.log_wandb:
-                    wandb.log(
-                        dict(
-                            gradient_steps=self.num_gradient_steps,
-                            loss=loss,
-                        )
-                    )
+                self.tune_log()
 
         def _on_step(self) -> bool:
             if (
@@ -530,22 +565,10 @@ def main(
                 sim_env.update_gym_env(sim_gym_env, parameter)
                 sim_eval_env.set_model_parameter(parameter)
 
-            tune_callback = TuneCallback(
-                env=loss_env,
-                rollout_env=preal_env,
-                update_env=update_env,
-                parameter=default_parameter.copy(),
-                parameter_range=sim_env.diff_env.parameter_range,
-                parameter_mask=parameter_mask,
-                loss_function=single_transition_loss,
-                config=config.tune,
-                log_wandb=config.log_wandb,
-                verbose=config.verbose,
-            )
-
             callback_on_log = (
                 (lambda metrics: wandb.log(metrics)) if config.log_wandb else None
             )
+
             sim_eval_callback = EvalCallback(
                 sim_eval_env,
                 prefix="sim_",
@@ -560,6 +583,20 @@ def main(
                 n_eval_episodes=config.eval.num_episodes,
                 callback_on_log=callback_on_log,
                 eval_freq=config.eval.frequency // config.train.num_envs,
+                verbose=config.verbose,
+            )
+            tune_callback = TuneCallback(
+                env=loss_env,
+                rollout_env=preal_env,
+                update_env=update_env,
+                parameter=default_parameter.copy(),
+                parameter_range=sim_env.diff_env.parameter_range,
+                parameter_mask=parameter_mask,
+                loss_function=single_transition_loss,
+                config=config.tune,
+                sim_eval_callback=sim_eval_callback,
+                preal_eval_callback=preal_eval_callback,
+                callback_on_log=callback_on_log,
                 verbose=config.verbose,
             )
 
@@ -586,6 +623,9 @@ def main(
                 callback=[sim_eval_callback, preal_eval_callback, tune_callback],
                 progress_bar=True,
             )
+
+            # Log the final performance of the last rollouts
+            tune_callback.rollout_log()
 
             if config.log_wandb:
                 wandb.finish()
